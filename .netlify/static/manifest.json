@@ -1,0 +1,43 @@
+{
+  "name": "NontonTV - Siaran TV Indonesia Langsung",
+  "short_name": "NontonTV",
+  "description": "Tonton siaran langsung TV Indonesia kapan saja, di mana saja. RCTI, SCTV, Metro TV, TV One, dan 200+ channel lainnya!",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#dc2626",
+  "orientation": "any",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["entertainment", "lifestyle", "news"],
+  "lang": "id",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Tonton TV",
+      "url": "/",
+      "description": "Buka NontonTV"
+    }
+  ]
+}

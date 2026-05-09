@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useSyncExternalStore } from 'react';
 import { VideoPlayer } from '@/components/video-player';
 import { ChannelCard } from '@/components/channel-card';
 import { channels, categories, TVChannel } from '@/lib/channels';
@@ -18,29 +18,42 @@ import {
   X,
 } from 'lucide-react';
 
+// Online status via useSyncExternalStore (avoids hydration mismatch)
+function subscribeOnline(callback: () => void) {
+  window.addEventListener('online', callback);
+  window.addEventListener('offline', callback);
+  return () => {
+    window.removeEventListener('online', callback);
+    window.removeEventListener('offline', callback);
+  };
+}
+function getOnlineSnapshot() {
+  return navigator.onLine;
+}
+function getOnlineServerSnapshot() {
+  return true; // SSR always assumes online
+}
+
+// Mounted state via useSyncExternalStore
+function subscribeNoop(callback: () => void) {
+  return () => {};
+}
+function getMountedSnapshot() {
+  return true;
+}
+function getMountedServerSnapshot() {
+  return false;
+}
+
 export default function HomePage() {
   const [selectedChannel, setSelectedChannel] = useState<TVChannel>(channels[0]);
   const [activeCategory, setActiveCategory] = useState('semua');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isOnline, setIsOnline] = useState(() => {
-    if (typeof navigator !== 'undefined') return navigator.onLine;
-    return true;
-  });
+  const isOnline = useSyncExternalStore(subscribeOnline, getOnlineSnapshot, getOnlineServerSnapshot);
+  const mounted = useSyncExternalStore(subscribeNoop, getMountedSnapshot, getMountedServerSnapshot);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showSearch, setShowSearch] = useState(false);
-
-  // Online status
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
 
   // PWA Install prompt
   useEffect(() => {
@@ -94,8 +107,8 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950">
-      {/* Offline Banner */}
-      {!isOnline && (
+      {/* Offline Banner - client only */}
+      {mounted && !isOnline && (
         <div className="bg-yellow-600 text-white text-center py-2 px-4 text-sm flex items-center justify-center gap-2">
           <WifiOff className="w-4 h-4" />
           Anda sedang offline. Pastikan koneksi internet aktif untuk menonton TV.
@@ -129,7 +142,7 @@ export default function HomePage() {
             </Button>
 
             {/* PWA Install Button */}
-            {showInstallPrompt && (
+            {mounted && showInstallPrompt && (
               <Button
                 onClick={handleInstall}
                 size="sm"
@@ -141,7 +154,9 @@ export default function HomePage() {
             )}
 
             {/* Online Status */}
-            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
+            {mounted && (
+              <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
+            )}
           </div>
         </div>
 
@@ -288,7 +303,7 @@ export default function HomePage() {
       </footer>
 
       {/* PWA Install Banner (mobile) */}
-      {showInstallPrompt && (
+      {mounted && showInstallPrompt && (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-gray-900 border-t border-white/10 p-4 sm:hidden">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 flex-1">

@@ -3,11 +3,18 @@
 import { useState, useMemo, useEffect, useCallback, useSyncExternalStore } from 'react';
 import { VideoPlayer } from '@/components/video-player';
 import { ChannelCard } from '@/components/channel-card';
-import { channels, categories, TVChannel } from '@/lib/channels';
+import { channels, categories, regions, TVChannel } from '@/lib/channels';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Search,
   Tv,
@@ -16,6 +23,10 @@ import {
   WifiOff,
   MonitorPlay,
   X,
+  MapPin,
+  ListFilter,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 
 // Online status via useSyncExternalStore (avoids hydration mismatch)
@@ -45,15 +56,19 @@ function getMountedServerSnapshot() {
   return false;
 }
 
+type ViewMode = 'grid' | 'list';
+
 export default function HomePage() {
   const [selectedChannel, setSelectedChannel] = useState<TVChannel>(channels[0]);
   const [activeCategory, setActiveCategory] = useState('semua');
+  const [activeRegion, setActiveRegion] = useState('Semua Wilayah');
   const [searchQuery, setSearchQuery] = useState('');
   const isOnline = useSyncExternalStore(subscribeOnline, getOnlineSnapshot, getOnlineServerSnapshot);
   const mounted = useSyncExternalStore(subscribeNoop, getMountedSnapshot, getMountedServerSnapshot);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   // PWA Install prompt
   useEffect(() => {
@@ -82,6 +97,9 @@ export default function HomePage() {
     if (activeCategory !== 'semua') {
       result = result.filter((ch) => ch.category === activeCategory);
     }
+    if (activeRegion !== 'Semua Wilayah') {
+      result = result.filter((ch) => ch.region === activeRegion);
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -93,7 +111,18 @@ export default function HomePage() {
       );
     }
     return result;
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, activeRegion, searchQuery]);
+
+  // Group channels by region for the "daerah" and "tvri" categories
+  const groupedByRegion = useMemo(() => {
+    if (activeCategory !== 'daerah' && activeCategory !== 'tvri') return null;
+    const grouped: Record<string, TVChannel[]> = {};
+    filteredChannels.forEach((ch) => {
+      if (!grouped[ch.region]) grouped[ch.region] = [];
+      grouped[ch.region].push(ch);
+    });
+    return grouped;
+  }, [activeCategory, filteredChannels]);
 
   const handleChannelSelect = useCallback((channel: TVChannel) => {
     setSelectedChannel(channel);
@@ -104,6 +133,20 @@ export default function HomePage() {
   const handleError = useCallback((error: string) => {
     console.error('Stream error:', error);
   }, []);
+
+  // Region options based on current category
+  const availableRegions = useMemo(() => {
+    let relevant = channels;
+    if (activeCategory !== 'semua') {
+      relevant = relevant.filter((ch) => ch.category === activeCategory);
+    }
+    const regionSet = new Set(relevant.map((ch) => ch.region));
+    return ['Semua Wilayah', ...regions.filter((r) => regionSet.has(r))];
+  }, [activeCategory]);
+
+  const categoryName = activeCategory === 'semua'
+    ? 'Semua Channel'
+    : categories.find((c) => c.id === activeCategory)?.name;
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950">
@@ -126,11 +169,21 @@ export default function HomePage() {
               <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
                 Nonton<span className="text-red-500">TV</span>
               </h1>
-              <p className="text-[10px] text-gray-400 -mt-0.5 hidden sm:block">Siaran TV Indonesia Langsung</p>
+              <p className="text-[10px] text-gray-400 -mt-0.5 hidden sm:block">Siaran TV Digital Indonesia Langsung</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            {/* View Mode Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+              className="text-gray-400 hover:text-white hover:bg-white/5 h-9 w-9 hidden sm:flex"
+            >
+              {viewMode === 'grid' ? <List className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
+            </Button>
+
             {/* Search Toggle */}
             <Button
               variant="ghost"
@@ -166,7 +219,7 @@ export default function HomePage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <Input
-                placeholder="Cari channel TV..."
+                placeholder="Cari channel TV, wilayah..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
@@ -219,7 +272,7 @@ export default function HomePage() {
         </section>
 
         {/* Category Tabs */}
-        <section className="mb-4">
+        <section className="mb-3">
           <ScrollArea className="w-full">
             <div className="flex gap-2 pb-2">
               {categories.map((cat) => (
@@ -227,7 +280,10 @@ export default function HomePage() {
                   key={cat.id}
                   variant={activeCategory === cat.id ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setActiveCategory(cat.id)}
+                  onClick={() => {
+                    setActiveCategory(cat.id);
+                    setActiveRegion('Semua Wilayah');
+                  }}
                   className={`flex-shrink-0 gap-1.5 text-xs sm:text-sm ${
                     activeCategory === cat.id
                       ? 'bg-red-600 hover:bg-red-700 text-white border-red-600'
@@ -243,20 +299,46 @@ export default function HomePage() {
           </ScrollArea>
         </section>
 
-        {/* Channel Grid */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
+        {/* Region Filter + Stats Bar */}
+        <section className="mb-4 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             <h3 className="text-white font-semibold text-sm sm:text-base flex items-center gap-2">
               <MonitorPlay className="w-4 h-4 text-red-500" />
-              {activeCategory === 'semua'
-                ? 'Semua Channel'
-                : categories.find((c) => c.id === activeCategory)?.name}
+              {categoryName}
               <Badge variant="secondary" className="text-xs font-normal">
                 {filteredChannels.length}
               </Badge>
             </h3>
           </div>
+          <div className="flex items-center gap-2">
+            <MapPin className="w-3.5 h-3.5 text-gray-400" />
+            <Select value={activeRegion} onValueChange={setActiveRegion}>
+              <SelectTrigger className="w-[160px] sm:w-[200px] h-8 text-xs bg-white/5 border-white/10 text-gray-300">
+                <SelectValue placeholder="Pilih Wilayah" />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-900 border-white/10 max-h-72">
+                {availableRegions.map((region) => (
+                  <SelectItem key={region} value={region} className="text-gray-300 text-xs focus:bg-white/10 focus:text-white">
+                    {region}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {activeRegion !== 'Semua Wilayah' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setActiveRegion('Semua Wilayah')}
+                className="h-8 w-8 text-gray-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
+        </section>
 
+        {/* Channel Grid/List */}
+        <section>
           {filteredChannels.length === 0 ? (
             <div className="text-center py-12">
               <Search className="w-12 h-12 text-gray-600 mx-auto mb-3" />
@@ -266,20 +348,56 @@ export default function HomePage() {
                 onClick={() => {
                   setSearchQuery('');
                   setActiveCategory('semua');
+                  setActiveRegion('Semua Wilayah');
                 }}
                 className="text-red-400 mt-2"
               >
                 Reset filter
               </Button>
             </div>
+          ) : groupedByRegion ? (
+            // Grouped by region for daerah/tvri categories
+            <div className="space-y-6">
+              {Object.entries(groupedByRegion).sort(([a], [b]) => a.localeCompare(b)).map(([region, regionChannels]) => (
+                <div key={region}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <MapPin className="w-3.5 h-3.5 text-red-400" />
+                    <h4 className="text-white font-medium text-sm">{region}</h4>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      {regionChannels.length}
+                    </Badge>
+                  </div>
+                  <div className={
+                    viewMode === 'grid'
+                      ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3'
+                      : 'flex flex-col gap-1.5'
+                  }>
+                    {regionChannels.map((channel) => (
+                      <ChannelCard
+                        key={channel.id}
+                        channel={channel}
+                        isActive={selectedChannel.id === channel.id}
+                        onClick={() => handleChannelSelect(channel)}
+                        compact={viewMode === 'list'}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+            <div className={
+              viewMode === 'grid'
+                ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3'
+                : 'flex flex-col gap-1.5'
+            }>
               {filteredChannels.map((channel) => (
                 <ChannelCard
                   key={channel.id}
                   channel={channel}
                   isActive={selectedChannel.id === channel.id}
                   onClick={() => handleChannelSelect(channel)}
+                  compact={viewMode === 'list'}
                 />
               ))}
             </div>
@@ -293,7 +411,7 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             <Tv className="w-4 h-4 text-red-500" />
             <span className="text-gray-500 text-xs">
-              NontonTV © {new Date().getFullYear()} — Siaran TV Indonesia Langsung
+              NontonTV © {new Date().getFullYear()} — {channels.length} Siaran TV Digital Indonesia Langsung
             </span>
           </div>
           <p className="text-gray-600 text-xs">

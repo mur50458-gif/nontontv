@@ -11,9 +11,27 @@ interface VideoPlayerProps {
   onError?: (error: string) => void;
 }
 
+type StreamType = 'hls' | 'dash' | 'native';
+
+function detectStreamType(url: string): StreamType {
+  if (url.includes('.mpd') || url.includes('manifest.mpd')) return 'dash';
+  if (url.includes('.m3u8') || url.includes('playlist.m3u8') || url.includes('/index.m3u8') || url.includes('smil:') && url.includes('.m3u8')) return 'hls';
+  return 'hls';
+}
+
+// Lazy-load dashjs to avoid SSR window reference error
+let dashjsModule: typeof import('dashjs') | null = null;
+async function getDashjs() {
+  if (!dashjsModule) {
+    dashjsModule = await import('dashjs');
+  }
+  return dashjsModule;
+}
+
 export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const dashRef = useRef<any>(null); // dashjs MediaPlayer - dynamically loaded
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playPromiseRef = useRef<Promise<void> | null>(null);
@@ -48,10 +66,9 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
     setShowOverlay(true);
   }
 
-  // Safely call play() — tracks the promise to prevent "interrupted by pause()" error
+  // Safely call play()
   const safePlay = useCallback((video: HTMLVideoElement) => {
     if (playPromiseRef.current) {
-      // A play is already in progress — chain after it
       playPromiseRef.current = playPromiseRef.current.then(() => {
         const p = video.play();
         if (p) {
@@ -68,7 +85,7 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
     }
   }, []);
 
-  // Safely call pause() — waits for pending play promise first
+  // Safely call pause()
   const safePause = useCallback((video: HTMLVideoElement) => {
     if (playPromiseRef.current) {
       playPromiseRef.current = playPromiseRef.current.then(() => {
@@ -81,81 +98,142 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
     video.pause();
   }, []);
 
-  // Initialize HLS
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !streamUrl) return;
-
-    // Destroy previous instance
+  // Destroy all player instances
+  const destroyPlayers = useCallback(() => {
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
+    if (dashRef.current) {
+      dashRef.current.reset();
+      dashRef.current = null;
+    }
     playPromiseRef.current = null;
+  }, []);
 
-    if (Hls.isSupported()) {
-      const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 90,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        startLevel: -1,
-        progressive: true,
-      });
+  // Initialize stream
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !streamUrl) return;
 
-      hls.loadSource(streamUrl);
-      hls.attachMedia(video);
+    // Destroy previous instances
+    destroyPlayers();
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        safePlay(video);
-      });
+    const streamType = detectStreamType(streamUrl);
 
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) {
-          retryCountRef.current += 1;
-          if (retryCountRef.current > 5) {
-            setError('Gagal memuat siaran setelah beberapa percobaan. Silakan coba channel lain.');
-            hls.destroy();
-            onError?.('Max retries exceeded');
-            return;
-          }
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              setError('Koneksi bermasalah. Mencoba menghubungkan kembali...');
-              hls.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              setError('Media error. Mencoba memulihkan...');
-              hls.recoverMediaError();
-              break;
-            default:
-              setError('Gagal memuat siaran. Silakan coba channel lain.');
-              hls.destroy();
-              onError?.('Fatal HLS error');
-              break;
-          }
+    if (streamType === 'dash') {
+      // DASH stream - dynamically import dashjs
+      let cancelled = false;
+      getDashjs().then((dashjsLib) => {
+        if (cancelled || !video) return;
+        try {
+          const player = dashjsLib.MediaPlayer().create();
+          player.initialize(video, streamUrl, true);
+          player.updateSettings({
+            streaming: {
+              abr: {
+                autoSwitchBitrate: { video: true, audio: true },
+              },
+              buffer: {
+                fastSwitchEnabled: true,
+              },
+            },
+          });
+
+          player.on(dashjsLib.MediaPlayer.events.ERROR, () => {
+            retryCountRef.current += 1;
+            if (retryCountRef.current > 5) {
+              setError('Gagal memuat siaran setelah beberapa percobaan. Silakan coba channel lain.');
+              player.reset();
+              onError?.('Max retries exceeded');
+              return;
+            }
+            setError('Koneksi bermasalah. Mencoba menghubungkan kembali...');
+          });
+
+          player.on(dashjsLib.MediaPlayer.events.PLAYBACK_PLAYING, () => {
+            setIsLoading(false);
+            setIsPlaying(true);
+          });
+
+          dashRef.current = player;
+        } catch {
+          queueMicrotask(() => {
+            setError('Gagal memuat pemain DASH. Silakan coba channel lain.');
+          });
+        }
+      }).catch(() => {
+        if (!cancelled) {
+          queueMicrotask(() => {
+            setError('Gagal memuat pemain DASH. Silakan coba channel lain.');
+          });
         }
       });
 
-      hlsRef.current = hls;
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = streamUrl;
-      const onLoaded = () => {
-        safePlay(video);
-        video.removeEventListener('loadedmetadata', onLoaded);
+      return () => {
+        cancelled = true;
       };
-      video.addEventListener('loadedmetadata', onLoaded);
+    } else if (streamType === 'hls') {
+      if (Hls.isSupported()) {
+        const hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+          backBufferLength: 90,
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+          startLevel: -1,
+          progressive: true,
+        });
+
+        hls.loadSource(streamUrl);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          safePlay(video);
+        });
+
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.fatal) {
+            retryCountRef.current += 1;
+            if (retryCountRef.current > 5) {
+              setError('Gagal memuat siaran setelah beberapa percobaan. Silakan coba channel lain.');
+              hls.destroy();
+              onError?.('Max retries exceeded');
+              return;
+            }
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                setError('Koneksi bermasalah. Mencoba menghubungkan kembali...');
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                setError('Media error. Mencoba memulihkan...');
+                hls.recoverMediaError();
+                break;
+              default:
+                setError('Gagal memuat siaran. Silakan coba channel lain.');
+                hls.destroy();
+                onError?.('Fatal HLS error');
+                break;
+            }
+          }
+        });
+
+        hlsRef.current = hls;
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = streamUrl;
+        const onLoaded = () => {
+          safePlay(video);
+          video.removeEventListener('loadedmetadata', onLoaded);
+        };
+        video.addEventListener('loadedmetadata', onLoaded);
+      }
     }
 
     return () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-      playPromiseRef.current = null;
+      destroyPlayers();
     };
-  }, [streamUrl, onError, safePlay]);
+  }, [streamUrl, onError, safePlay, destroyPlayers]);
 
   // Sync playing state from native video events
   useEffect(() => {
@@ -244,6 +322,11 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
     setError(null);
     setIsLoading(true);
     retryCountRef.current = 0;
+    // Reinitialize the stream
+    if (dashRef.current) {
+      dashRef.current.reset();
+      dashRef.current = null;
+    }
     if (hlsRef.current) {
       hlsRef.current.loadSource(streamUrl);
     }

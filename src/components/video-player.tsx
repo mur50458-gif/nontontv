@@ -15,7 +15,8 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const controlsTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playPromiseRef = useRef<Promise<void> | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -25,10 +26,7 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
   const [showControls, setShowControls] = useState(true);
   const [showOverlay, setShowOverlay] = useState(true);
 
-  // Check browser HLS support (computed once during render)
-  const hlsNotSupported = !Hls.isSupported() && typeof window !== 'undefined' && !document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
-
-  // Adjust state when streamUrl prop changes (React-recommended pattern)
+  // Adjust state when streamUrl prop changes
   const [prevStreamUrl, setPrevStreamUrl] = useState(streamUrl);
   if (streamUrl !== prevStreamUrl) {
     setPrevStreamUrl(streamUrl);
@@ -44,6 +42,39 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
     setShowOverlay(true);
   }
 
+  // Safely call play() — tracks the promise to prevent "interrupted by pause()" error
+  const safePlay = useCallback((video: HTMLVideoElement) => {
+    if (playPromiseRef.current) {
+      // A play is already in progress — chain after it
+      playPromiseRef.current = playPromiseRef.current.then(() => {
+        const p = video.play();
+        if (p) {
+          playPromiseRef.current = p.catch(() => {});
+        }
+      }).catch(() => {});
+      return;
+    }
+    const p = video.play();
+    if (p) {
+      playPromiseRef.current = p.catch(() => {}).finally(() => {
+        playPromiseRef.current = null;
+      });
+    }
+  }, []);
+
+  // Safely call pause() — waits for pending play promise first
+  const safePause = useCallback((video: HTMLVideoElement) => {
+    if (playPromiseRef.current) {
+      playPromiseRef.current = playPromiseRef.current.then(() => {
+        video.pause();
+      }).catch(() => {
+        video.pause();
+      });
+      return;
+    }
+    video.pause();
+  }, []);
+
   // Initialize HLS
   useEffect(() => {
     const video = videoRef.current;
@@ -54,6 +85,7 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
+    playPromiseRef.current = null;
 
     if (Hls.isSupported()) {
       const hls = new Hls({
@@ -62,8 +94,7 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
         backBufferLength: 90,
         maxBufferLength: 30,
         maxMaxBufferLength: 60,
-        startLevel: -1, // auto quality
-        // Android 5+ compatibility
+        startLevel: -1,
         progressive: true,
       });
 
@@ -71,13 +102,7 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().then(() => {
-          setIsPlaying(true);
-          setIsLoading(false);
-        }).catch(() => {
-          // Autoplay blocked, user needs to interact
-          setIsLoading(false);
-        });
+        safePlay(video);
       });
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -102,26 +127,54 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
 
       hlsRef.current = hls;
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Native HLS support (Safari, some Android)
       video.src = streamUrl;
-      video.addEventListener('loadedmetadata', () => {
-        video.play().then(() => {
-          setIsPlaying(true);
-          setIsLoading(false);
-        }).catch(() => {
-          setIsLoading(false);
-        });
-      });
+      const onLoaded = () => {
+        safePlay(video);
+        video.removeEventListener('loadedmetadata', onLoaded);
+      };
+      video.addEventListener('loadedmetadata', onLoaded);
     }
-    // Browser not supported error is handled via hlsNotSupported computed value
 
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      playPromiseRef.current = null;
     };
-  }, [streamUrl, onError]);
+  }, [streamUrl, onError, safePlay]);
+
+  // Sync playing state from native video events
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const onPlay = () => {
+      setIsPlaying(true);
+      setIsLoading(false);
+    };
+    const onPause = () => setIsPlaying(false);
+    const onWaiting = () => setIsLoading(true);
+    const onPlaying = () => {
+      setIsLoading(false);
+      setIsPlaying(true);
+    };
+    const onCanPlay = () => setIsLoading(false);
+
+    video.addEventListener('play', onPlay);
+    video.addEventListener('pause', onPause);
+    video.addEventListener('waiting', onWaiting);
+    video.addEventListener('playing', onPlaying);
+    video.addEventListener('canplay', onCanPlay);
+
+    return () => {
+      video.removeEventListener('play', onPlay);
+      video.removeEventListener('pause', onPause);
+      video.removeEventListener('waiting', onWaiting);
+      video.removeEventListener('playing', onPlaying);
+      video.removeEventListener('canplay', onCanPlay);
+    };
+  }, []);
 
   // Auto-hide overlay after channel change
   useEffect(() => {
@@ -148,41 +201,39 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
-      video.play();
-      setIsPlaying(true);
+      safePlay(video);
     } else {
-      video.pause();
-      setIsPlaying(false);
+      safePause(video);
     }
-  };
+  }, [safePlay, safePause]);
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
-    setIsMuted(video.muted);
-  };
+    setIsMuted(!video.muted);
+  }, []);
 
-  const toggleFullscreen = async () => {
+  const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
     if (document.fullscreenElement) {
       await document.exitFullscreen();
     } else {
       await containerRef.current.requestFullscreen();
     }
-  };
+  }, []);
 
-  const retry = () => {
+  const retry = useCallback(() => {
     setError(null);
     setIsLoading(true);
     if (hlsRef.current) {
       hlsRef.current.loadSource(streamUrl);
     }
-  };
+  }, [streamUrl]);
 
   return (
     <div
@@ -211,11 +262,11 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
       )}
 
       {/* Error Overlay */}
-      {(error || hlsNotSupported) && (
+      {error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80">
           <div className="flex flex-col items-center gap-4 p-4 text-center">
             <AlertCircle className="w-12 h-12 text-red-400" />
-            <p className="text-white text-sm max-w-xs">{hlsNotSupported ? 'Browser Anda tidak mendukung streaming HLS.' : error}</p>
+            <p className="text-white text-sm max-w-xs">{error}</p>
             <Button
               variant="outline"
               size="sm"
@@ -225,7 +276,7 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
               }}
               className="text-white border-white/30 hover:bg-white/10"
             >
-              {hlsNotSupported ? 'Tutup' : 'Coba Lagi'}
+              Coba Lagi
             </Button>
           </div>
         </div>
@@ -233,7 +284,7 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
 
       {/* Channel Name Overlay (fades out) */}
       <div
-        className={`absolute top-4 left-4 transition-opacity duration-500 ${
+        className={`absolute top-4 left-4 transition-opacity duration-500 pointer-events-none ${
           showOverlay ? 'opacity-100' : 'opacity-0'
         }`}
       >
@@ -243,7 +294,7 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
       </div>
 
       {/* LIVE Badge */}
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-4 right-4 pointer-events-none">
         <div className="bg-red-600 rounded-md px-2 py-0.5 flex items-center gap-1.5">
           <Radio className="w-3 h-3 text-white" />
           <span className="text-white text-xs font-bold">LIVE</span>
@@ -252,8 +303,8 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
 
       {/* Controls */}
       <div
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 transition-opacity duration-300 ${
-          showControls ? 'opacity-100' : 'opacity-0'
+        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 transition-opacity duration-300 pointer-events-auto ${
+          showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={(e) => e.stopPropagation()}
       >

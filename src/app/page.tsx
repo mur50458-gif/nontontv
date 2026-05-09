@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback, useSyncExternalStore } from 'react';
+import { useState, useMemo, useEffect, useCallback, useSyncExternalStore, useRef } from 'react';
 import { VideoPlayer } from '@/components/video-player';
 import { ChannelCard } from '@/components/channel-card';
 import { channels, categories, regions, TVChannel } from '@/lib/channels';
@@ -16,6 +16,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import {
   Search,
   Tv,
   Download,
@@ -27,6 +34,12 @@ import {
   ListFilter,
   LayoutGrid,
   List,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  Radio,
+  ListOrdered,
 } from 'lucide-react';
 
 // Online status via useSyncExternalStore (avoids hydration mismatch)
@@ -139,6 +152,44 @@ export default function HomePage() {
     // Scroll to top on mobile to show player
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
+
+  // Channel navigation
+  const currentChannelIndex = useMemo(() => {
+    return filteredChannels.findIndex((ch) => ch.id === selectedChannel.id);
+  }, [filteredChannels, selectedChannel.id]);
+
+  const goToPrevChannel = useCallback(() => {
+    if (filteredChannels.length === 0) return;
+    const prevIndex = currentChannelIndex <= 0 ? filteredChannels.length - 1 : currentChannelIndex - 1;
+    setSelectedChannel(filteredChannels[prevIndex]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [filteredChannels, currentChannelIndex]);
+
+  const goToNextChannel = useCallback(() => {
+    if (filteredChannels.length === 0) return;
+    const nextIndex = currentChannelIndex >= filteredChannels.length - 1 ? 0 : currentChannelIndex + 1;
+    setSelectedChannel(filteredChannels[nextIndex]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [filteredChannels, currentChannelIndex]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't navigate when typing in search or select
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+      
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        goToPrevChannel();
+      } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        e.preventDefault();
+        goToNextChannel();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [goToPrevChannel, goToNextChannel]);
 
   const handleError = useCallback((error: string) => {
     console.error('Stream error:', error);
@@ -261,24 +312,139 @@ export default function HomePage() {
             headers={selectedChannel.headers}
           />
 
-          {/* Now Playing Info */}
-          <div className="mt-3 flex items-start justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center text-base font-bold text-white flex-shrink-0"
-                style={{ backgroundColor: selectedChannel.color }}
+          {/* Channel Navigator */}
+          <div className="mt-3 space-y-2">
+            {/* Prev/Next Navigation Bar */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={goToPrevChannel}
+                disabled={filteredChannels.length <= 1}
+                className="h-10 w-10 rounded-lg border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 text-white flex-shrink-0"
+                title="Channel sebelumnya (← / PageUp)"
               >
-                {selectedChannel.logoText}
-              </div>
-              <div>
-                <h2 className="text-white font-semibold text-sm sm:text-base">{selectedChannel.name}</h2>
-                <p className="text-gray-400 text-xs">{selectedChannel.description}</p>
-              </div>
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+
+              {/* Current Channel Info - clickable to open channel list */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <button className="flex-1 flex items-center gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer text-left min-w-0">
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center text-base font-bold text-white flex-shrink-0"
+                      style={{ backgroundColor: selectedChannel.color }}
+                    >
+                      {selectedChannel.logoText}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h2 className="text-white font-semibold text-sm sm:text-base truncate">{selectedChannel.name}</h2>
+                      <p className="text-gray-400 text-xs truncate">{selectedChannel.description}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Badge variant="destructive" className="gap-1 text-[10px]">
+                        <Wifi className="w-2.5 h-2.5" />
+                        LIVE
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px] tabular-nums">
+                        {currentChannelIndex >= 0 ? currentChannelIndex + 1 : '-'}/{filteredChannels.length}
+                      </Badge>
+                      <ListOrdered className="w-4 h-4 text-gray-500" />
+                    </div>
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[320px] sm:w-[400px] bg-gray-950 border-white/10 p-0">
+                  <SheetHeader className="px-4 pt-4 pb-2 border-b border-white/10">
+                    <SheetTitle className="text-white flex items-center gap-2">
+                      <MonitorPlay className="w-5 h-5 text-red-500" />
+                      Daftar Channel
+                      <Badge variant="secondary" className="text-xs font-normal">
+                        {filteredChannels.length}
+                      </Badge>
+                    </SheetTitle>
+                    <p className="text-gray-400 text-xs text-left">
+                      Gunakan ← → untuk pindah channel • Tap channel untuk menonton
+                    </p>
+                  </SheetHeader>
+                  <div className="overflow-y-auto max-h-[calc(100vh-120px)]">
+                    {filteredChannels.map((channel, idx) => (
+                      <div
+                        key={channel.id}
+                        className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-all border-l-2 ${
+                          selectedChannel.id === channel.id
+                            ? 'bg-red-500/10 border-l-red-500'
+                            : 'border-l-transparent hover:bg-white/5 hover:border-l-white/20'
+                        }`}
+                        onClick={() => {
+                          handleChannelSelect(channel);
+                        }}
+                      >
+                        <span className={`text-xs font-mono w-6 text-right flex-shrink-0 ${
+                          selectedChannel.id === channel.id ? 'text-red-400' : 'text-gray-600'
+                        }`}>
+                          {idx + 1}
+                        </span>
+                        <div
+                          className="w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                          style={{ backgroundColor: channel.color }}
+                        >
+                          {channel.logoText}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium truncate ${
+                            selectedChannel.id === channel.id ? 'text-white' : 'text-gray-300'
+                          }`}>
+                            {channel.name}
+                          </p>
+                          <p className="text-[11px] text-gray-500 truncate">{channel.description}</p>
+                        </div>
+                        {selectedChannel.id === channel.id && (
+                          <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 flex-shrink-0">
+                            <Radio className="w-2 h-2 mr-0.5" />
+                            LIVE
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </SheetContent>
+              </Sheet>
+
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={goToNextChannel}
+                disabled={filteredChannels.length <= 1}
+                className="h-10 w-10 rounded-lg border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 text-white flex-shrink-0"
+                title="Channel selanjutnya (→ / PageDown)"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </Button>
             </div>
-            <Badge variant="destructive" className="flex-shrink-0 gap-1">
-              <Wifi className="w-3 h-3" />
-              Sedang Siar
-            </Badge>
+
+            {/* Mobile: Up/Down Channel Buttons (visible on small screens) */}
+            <div className="flex items-center justify-center gap-3 sm:hidden">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToPrevChannel}
+                disabled={filteredChannels.length <= 1}
+                className="flex-1 gap-2 border-white/10 bg-white/5 hover:bg-white/10 text-white text-xs h-9"
+              >
+                <ChevronUp className="w-4 h-4" />
+                Channel Sebelumnya
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNextChannel}
+                disabled={filteredChannels.length <= 1}
+                className="flex-1 gap-2 border-white/10 bg-white/5 hover:bg-white/10 text-white text-xs h-9"
+              >
+                Channel Selanjutnya
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </section>
 

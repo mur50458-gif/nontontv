@@ -248,6 +248,7 @@ export default function HomePage() {
             streamUrl={selectedChannel.streamUrl}
             channelName={selectedChannel.name}
             onError={handleError}
+            headers={selectedChannel.headers}
           />
 
           {/* Now Playing Info */}

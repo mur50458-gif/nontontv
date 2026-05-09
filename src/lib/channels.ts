@@ -7,6 +7,7 @@ export interface TVChannel {
   logoText: string;
   color: string;
   region: string;
+  headers?: Record<string, string>;
 }
 
 export const categories = [
@@ -67,7 +68,7 @@ export const channels: TVChannel[] = [
     name: "RCTI",
     category: "nasional",
     description: "Rajawali Citra Televisi Indonesia - TV swasta pertama Indonesia",
-    streamUrl: "http://103.66.62.83:8000/play/a00v/index.m3u8",
+    streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/rcti/manifest.mpd",
     logoText: "RC",
     color: "#2563eb",
     region: "Nasional",
@@ -81,6 +82,7 @@ export const channels: TVChannel[] = [
     logoText: "SC",
     color: "#dc2626",
     region: "Nasional",
+    headers: { "Referer": "https://www.dens.tv/" },
   },
   {
     id: "indosiar",
@@ -91,6 +93,7 @@ export const channels: TVChannel[] = [
     logoText: "IS",
     color: "#f59e0b",
     region: "Nasional",
+    headers: { "Referer": "https://www.dens.tv/" },
   },
   {
     id: "transtv",
@@ -132,17 +135,7 @@ export const channels: TVChannel[] = [
     color: "#ea580c",
     region: "Nasional",
   },
-  {
-    id: "antv",
-    name: "ANTV",
-    category: "nasional",
-    description: "Andalas Televisi - TV swasta Indonesia",
-    streamUrl: "http://103.58.160.157:8278/720-ANTV/playlist.m3u8",
-    logoText: "AN",
-    color: "#16a34a",
-    region: "Nasional",
-  },
-  {
+    {
     id: "mdtv",
     name: "MDTV",
     category: "nasional",
@@ -172,17 +165,7 @@ export const channels: TVChannel[] = [
     color: "#059669",
     region: "Nasional",
   },
-  {
-    id: "elshintatv",
-    name: "Elshinta TV",
-    category: "nasional",
-    description: "Elshinta TV - TV berita dan informasi",
-    streamUrl: "https://ams.juraganstreaming.com:5443/LiveApp/streams/elshintatv.m3u8",
-    logoText: "ES",
-    color: "#ca8a04",
-    region: "Nasional",
-  },
-  {
+    {
     id: "tvri_nasional",
     name: "TVRI Nasional",
     category: "nasional",
@@ -192,17 +175,7 @@ export const channels: TVChannel[] = [
     color: "#0d9488",
     region: "Nasional",
   },
-  {
-    id: "rajawalitv",
-    name: "Rajawali TV",
-    category: "nasional",
-    description: "Rajawali Televisi - TV nasional Indonesia",
-    streamUrl: "http://175.158.57.130:8888/stream/channelid/412436804",
-    logoText: "RT",
-    color: "#be185d",
-    region: "Nasional",
-  },
-  {
+    {
     id: "nusantaratv",
     name: "Nusantara TV",
     category: "nasional",
@@ -221,6 +194,7 @@ export const channels: TVChannel[] = [
     logoText: "MJ",
     color: "#e11d48",
     region: "Nasional",
+    headers: { "Referer": "https://www.dens.tv/" },
   },
 
   // ===== BERITA =====
@@ -253,6 +227,7 @@ export const channels: TVChannel[] = [
     logoText: "KT",
     color: "#1d4ed8",
     region: "Nasional",
+    headers: { "Referer": "https://www.dens.tv/" },
   },
   {
     id: "inews",
@@ -264,17 +239,7 @@ export const channels: TVChannel[] = [
     color: "#ea580c",
     region: "Nasional",
   },
-  {
-    id: "beritasatu",
-    name: "BeritaSatu",
-    category: "berita",
-    description: "TV berita bisnis dan ekonomi",
-    streamUrl: "https://beritasatu.secureswiftcontent.com/han/beritasatu/bsatu10008r/srtoutput/manifest.m3u8",
-    logoText: "B1",
-    color: "#c2410c",
-    region: "Nasional",
-  },
-  {
+    {
     id: "cnbcindonesia",
     name: "CNBC Indonesia",
     category: "berita",
@@ -284,27 +249,7 @@ export const channels: TVChannel[] = [
     color: "#1e40af",
     region: "Nasional",
   },
-  {
-    id: "btv",
-    name: "BTV",
-    category: "berita",
-    description: "Berita Televisi - TV berita terkini",
-    streamUrl: "https://btv.secureswiftcontent.com/han/btv/btv10005r/srtoutput/manifest.m3u8",
-    logoText: "BT",
-    color: "#dc2626",
-    region: "Nasional",
-  },
-  {
-    id: "jktglobe",
-    name: "Jakarta Globe News",
-    category: "berita",
-    description: "Jakarta Globe News Channel - berita terkini",
-    streamUrl: "https://jktglobe.secureswiftcontent.com/han/jktglobe/jktglober/srtoutput/manifest.m3u8",
-    logoText: "JG",
-    color: "#0f766e",
-    region: "Nasional",
-  },
-  {
+      {
     id: "magna",
     name: "Magna Channel",
     category: "berita",
@@ -375,6 +320,7 @@ export const channels: TVChannel[] = [
     logoText: "DS",
     color: "#e11d48",
     region: "Nasional",
+    headers: { "Referer": "https://www.dens.tv/" },
   },
   {
     id: "mycinema",
@@ -385,6 +331,7 @@ export const channels: TVChannel[] = [
     logoText: "MC",
     color: "#9333ea",
     region: "Nasional",
+    headers: { "Referer": "https://www.dens.tv/" },
   },
   {
     id: "channeljowo",
@@ -395,6 +342,7 @@ export const channels: TVChannel[] = [
     logoText: "CJ",
     color: "#ca8a04",
     region: "Jawa Tengah",
+    headers: { "Referer": "https://www.dens.tv/" },
   },
 
   // ===== ANAK =====
@@ -428,27 +376,7 @@ export const channels: TVChannel[] = [
     color: "#ec4899",
     region: "Nasional",
   },
-  {
-    id: "kidstv",
-    name: "Kids TV",
-    category: "anak",
-    description: "Kids TV - Channel kartun dan anak",
-    streamUrl: "http://origin5.mediacdn.ru/live/kidstv/index.m3u8",
-    logoText: "KT",
-    color: "#16a34a",
-    region: "Nasional",
-  },
-  {
-    id: "vtv",
-    name: "VTV",
-    category: "anak",
-    description: "VTV - Channel anak dan keluarga",
-    streamUrl: "http://103.66.62.83:8000/play/a00c/index.m3u8",
-    logoText: "VT",
-    color: "#0284c7",
-    region: "Nasional",
-  },
-
+    
   // ===== OLAHRAGA =====
   {
     id: "tvrisport",
@@ -554,17 +482,7 @@ export const channels: TVChannel[] = [
     color: "#d97706",
     region: "Nasional",
   },
-  {
-    id: "ashiltv",
-    name: "Ashiil TV",
-    category: "religi",
-    description: "Ashiil TV - TV dakwah Islam",
-    streamUrl: "https://ams.juraganstreaming.com:5443/LiveApp/streams/ashiiltv2.m3u8",
-    logoText: "AS",
-    color: "#065f46",
-    region: "Nasional",
-  },
-  {
+    {
     id: "dmireligi",
     name: "DMI TV",
     category: "religi",
@@ -574,17 +492,7 @@ export const channels: TVChannel[] = [
     color: "#166534",
     region: "Nasional",
   },
-  {
-    id: "fajartv",
-    name: "Fajar TV",
-    category: "religi",
-    description: "Fajar TV - TV dakwah Islam",
-    streamUrl: "http://122.248.43.242:1935/FAJARTV/_definst_/myStream/playlist.m3u8",
-    logoText: "FJ",
-    color: "#15803d",
-    region: "Nasional",
-  },
-  {
+    {
     id: "iamchannel",
     name: "I Am Channel",
     category: "religi",
@@ -604,17 +512,7 @@ export const channels: TVChannel[] = [
     color: "#7c3aed",
     region: "Nasional",
   },
-  {
-    id: "mgitv",
-    name: "MGI TV",
-    category: "religi",
-    description: "MGI TV - TV dakwah Islam",
-    streamUrl: "https://tv.rodja.live/tasik/ngrp:mgitv_all/playlist.m3u8",
-    logoText: "MG",
-    color: "#14532d",
-    region: "Nasional",
-  },
-  {
+    {
     id: "mqtv",
     name: "MQTV",
     category: "religi",
@@ -664,17 +562,7 @@ export const channels: TVChannel[] = [
     color: "#065f46",
     region: "Nasional",
   },
-  {
-    id: "surautv",
-    name: "Surau TV",
-    category: "religi",
-    description: "Surau TV - TV dakwah Islam",
-    streamUrl: "https://surautv.siar.us/live/surautv.m3u8",
-    logoText: "SR",
-    color: "#166534",
-    region: "Nasional",
-  },
-  {
+    {
     id: "tvmui",
     name: "TV MUI",
     category: "religi",
@@ -684,17 +572,7 @@ export const channels: TVChannel[] = [
     color: "#14532d",
     region: "Nasional",
   },
-  {
-    id: "wesaltv",
-    name: "Wesal TV",
-    category: "religi",
-    description: "Wesal TV - TV dakwah Islam",
-    streamUrl: "https://ams.juraganstreaming.com:5443/LiveApp/streams/wesaltv.m3u8",
-    logoText: "WS",
-    color: "#15803d",
-    region: "Nasional",
-  },
-
+  
   // ===== GAYA HIDUP =====
   {
     id: "biznetadventure",
@@ -725,6 +603,7 @@ export const channels: TVChannel[] = [
     logoText: "DL",
     color: "#0e7490",
     region: "Nasional",
+    headers: { "Referer": "https://www.dens.tv/" },
   },
   {
     id: "densplay",
@@ -735,6 +614,7 @@ export const channels: TVChannel[] = [
     logoText: "DP",
     color: "#7c3aed",
     region: "Nasional",
+    headers: { "Referer": "https://www.dens.tv/" },
   },
   {
     id: "densfood",
@@ -745,6 +625,7 @@ export const channels: TVChannel[] = [
     logoText: "DF",
     color: "#dc2626",
     region: "Nasional",
+    headers: { "Referer": "https://www.dens.tv/" },
   },
   {
     id: "myfamily",
@@ -755,6 +636,7 @@ export const channels: TVChannel[] = [
     logoText: "MF",
     color: "#059669",
     region: "Nasional",
+    headers: { "Referer": "https://www.dens.tv/" },
   },
   {
     id: "saliratv",
@@ -810,17 +692,7 @@ export const channels: TVChannel[] = [
     color: "#1d4ed8",
     region: "Jawa Timur",
   },
-  {
-    id: "jawapostv_bali",
-    name: "Jawa Pos TV Bali",
-    category: "daerah",
-    description: "Jawa Pos TV Bali - TV lokal Bali",
-    streamUrl: "http://122.248.43.242:1935/JAWAPOSTVBALI/_definst_/myStream/playlist.m3u8",
-    logoText: "JP",
-    color: "#1d4ed8",
-    region: "Bali",
-  },
-  {
+    {
     id: "jawapostv_jkt",
     name: "Jawa Pos TV Jakarta",
     category: "daerah",
@@ -840,17 +712,7 @@ export const channels: TVChannel[] = [
     color: "#1d4ed8",
     region: "Jawa Timur",
   },
-  {
-    id: "jawapostv_magelang",
-    name: "Jawa Pos TV Magelang",
-    category: "daerah",
-    description: "Jawa Pos TV Magelang - TV lokal Jawa Tengah",
-    streamUrl: "http://122.248.43.242:1935/JAWAPOSTVMAGELANG/_definst_/myStream/playlist.m3u8",
-    logoText: "JP",
-    color: "#1d4ed8",
-    region: "Jawa Tengah",
-  },
-  {
+    {
     id: "jawapostv_semarang",
     name: "Jawa Pos TV Semarang",
     category: "daerah",
@@ -1050,17 +912,7 @@ export const channels: TVChannel[] = [
     color: "#0284c7",
     region: "Jawa Tengah",
   },
-  {
-    id: "mgstv",
-    name: "MGS TV",
-    category: "daerah",
-    description: "MGS TV - TV lokal Jakarta",
-    streamUrl: "https://cdn.gunadarma.ac.id/streams/mgstv/ingestmgstv.m3u8",
-    logoText: "MG",
-    color: "#7c3aed",
-    region: "DKI Jakarta",
-  },
-  {
+    {
     id: "ugtv",
     name: "UGTV",
     category: "daerah",
@@ -1070,27 +922,7 @@ export const channels: TVChannel[] = [
     color: "#1d4ed8",
     region: "DKI Jakarta",
   },
-  {
-    id: "ubtv",
-    name: "UBTV Brawijaya",
-    category: "daerah",
-    description: "UBTV - TV kampus Universitas Brawijaya",
-    streamUrl: "https://ubmedcom.siar.us/live/ubmedcom.m3u8",
-    logoText: "UB",
-    color: "#dc2626",
-    region: "Jawa Timur",
-  },
-  {
-    id: "pjtv",
-    name: "PJTV",
-    category: "daerah",
-    description: "PJTV - TV lokal Bandung",
-    streamUrl: "https://pjtv28uhf.siar.us/live/pjtv28uhf.m3u8",
-    logoText: "PJ",
-    color: "#0e7490",
-    region: "Jawa Barat",
-  },
-  {
+      {
     id: "jaktv",
     name: "Jak TV",
     category: "daerah",
@@ -1130,17 +962,7 @@ export const channels: TVChannel[] = [
     color: "#7c3aed",
     region: "Jawa Barat",
   },
-  {
-    id: "onlinetvnusantara",
-    name: "Online TV Nusantara",
-    category: "daerah",
-    description: "Online TV Nusantara - TV budaya dan musik",
-    streamUrl: "https://5bf7b725107e5.streamlock.net/onlinetvnusantara/onlinetvnusantara/playlist.m3u8",
-    logoText: "ON",
-    color: "#059669",
-    region: "Jawa Barat",
-  },
-
+  
   // ===== DAERAH - Jawa (Stara TV network) =====
   {
     id: "staratv",
@@ -1234,17 +1056,7 @@ export const channels: TVChannel[] = [
     color: "#16a34a",
     region: "Riau",
   },
-  {
-    id: "jambitv",
-    name: "Jambi TV",
-    category: "daerah",
-    description: "Jambi TV - TV lokal Jambi",
-    streamUrl: "https://ams.juraganstreaming.com:5443/JambiTV/streams/livestream.m3u8",
-    logoText: "JB",
-    color: "#059669",
-    region: "Jambi",
-  },
-  {
+    {
     id: "batamtv",
     name: "Batam TV",
     category: "daerah",
@@ -1264,37 +1076,7 @@ export const channels: TVChannel[] = [
     color: "#dc2626",
     region: "Sumatera Selatan",
   },
-  {
-    id: "rakyatbengkulu",
-    name: "Rakyat Bengkulu TV",
-    category: "daerah",
-    description: "Rakyat Bengkulu TV - TV lokal Bengkulu",
-    streamUrl: "https://flv.intechmedia.net/live/ch59.m3u8",
-    logoText: "RB",
-    color: "#7c3aed",
-    region: "Bengkulu",
-  },
-  {
-    id: "radarlampung",
-    name: "Radar Lampung TV",
-    category: "daerah",
-    description: "Radar Lampung TV - TV lokal Lampung",
-    streamUrl: "https://www.streaming.radartv.co.id/hls/test.m3u8",
-    logoText: "RL",
-    color: "#ea580c",
-    region: "Lampung",
-  },
-  {
-    id: "tegartvlampung",
-    name: "Tegar TV Lampung",
-    category: "daerah",
-    description: "Tegar TV - TV lokal Lampung",
-    streamUrl: "http://wms.klikhost.com:1935/tegartv/tegartv/playlist.m3u8",
-    logoText: "TG",
-    color: "#059669",
-    region: "Lampung",
-  },
-  {
+        {
     id: "radartv_tasik",
     name: "Radar Tasikmalaya TV",
     category: "daerah",
@@ -1304,29 +1086,9 @@ export const channels: TVChannel[] = [
     color: "#0e7490",
     region: "Jawa Barat",
   },
-  {
-    id: "pujatv",
-    name: "Puja TV Aceh",
-    category: "daerah",
-    description: "Puja TV - TV lokal Aceh",
-    streamUrl: "https://v6.siar.us/pujatv/live/chunks.m3u8",
-    logoText: "PJ",
-    color: "#16a34a",
-    region: "Aceh",
-  },
-
+  
   // ===== DAERAH - Kalimantan =====
-  {
-    id: "balikpapanTV",
-    name: "Balikpapan TV",
-    category: "daerah",
-    description: "Balikpapan TV - TV lokal Kalimantan Timur",
-    streamUrl: "https://5bf7b725107e5.streamlock.net/btv/btv/playlist.m3u8",
-    logoText: "BP",
-    color: "#ea580c",
-    region: "Kalimantan Timur",
-  },
-  {
+    {
     id: "banjartv",
     name: "Banjar TV",
     category: "daerah",
@@ -1386,17 +1148,7 @@ export const channels: TVChannel[] = [
     color: "#16a34a",
     region: "Jambi",
   },
-  {
-    id: "sampittv",
-    name: "Sampit TV",
-    category: "daerah",
-    description: "Sampit TV - TV lokal Kalimantan Tengah",
-    streamUrl: "https://sampit-tv.siar.us/live/sampit-tv.m3u8",
-    logoText: "SM",
-    color: "#0e7490",
-    region: "Kalimantan Tengah",
-  },
-
+  
   // ===== DAERAH - Sulawesi =====
   {
     id: "celebestv",
@@ -1418,27 +1170,7 @@ export const channels: TVChannel[] = [
     color: "#16a34a",
     region: "Sulawesi Utara",
   },
-  {
-    id: "sultratv",
-    name: "Sultra TV",
-    category: "daerah",
-    description: "Sultra TV - TV lokal Sulawesi Tenggara",
-    streamUrl: "http://122.248.43.242:1935/SULTRATV/_definst_/myStream/playlist.m3u8",
-    logoText: "SU",
-    color: "#7c3aed",
-    region: "Sulawesi Tenggara",
-  },
-  {
-    id: "sangajitv",
-    name: "Sangaji TV",
-    category: "daerah",
-    description: "Sangaji TV - TV lokal Sulawesi Tengah",
-    streamUrl: "https://cdn.gunadarma.ac.id/streams/sangajitv/ingestsangajitv.m3u8",
-    logoText: "SG",
-    color: "#0e7490",
-    region: "Sulawesi Tengah",
-  },
-  {
+      {
     id: "selaparangtv",
     name: "Selaparang TV",
     category: "daerah",
@@ -1460,17 +1192,7 @@ export const channels: TVChannel[] = [
   },
 
   // ===== DAERAH - NTT/NTB/Bali/Maluku/Papua =====
-  {
-    id: "atambuatv",
-    name: "Atambua TV",
-    category: "daerah",
-    description: "Atambua TV - TV lokal Nusa Tenggara Timur",
-    streamUrl: "http://122.248.43.242:1935/ATAMBUATV/_definst_/myStream/playlist.m3u8",
-    logoText: "AT",
-    color: "#dc2626",
-    region: "Nusa Tenggara Timur",
-  },
-  {
+    {
     id: "timortv",
     name: "Timor TV",
     category: "daerah",
@@ -1520,17 +1242,7 @@ export const channels: TVChannel[] = [
     color: "#dc2626",
     region: "Jawa Timur",
   },
-  {
-    id: "simpang5tv",
-    name: "Simpang5 TV",
-    category: "daerah",
-    description: "Simpang5 TV - TV lokal Jawa Timur",
-    streamUrl: "http://122.248.43.242:1935/SIMPANG5TV/_definst_/myStream/playlist.m3u8",
-    logoText: "S5",
-    color: "#ca8a04",
-    region: "Jawa Timur",
-  },
-  {
+    {
     id: "saktitv",
     name: "Sakti TV",
     category: "daerah",
@@ -1570,27 +1282,7 @@ export const channels: TVChannel[] = [
     color: "#7c3aed",
     region: "Nasional",
   },
-  {
-    id: "uchannel",
-    name: "U Channel",
-    category: "daerah",
-    description: "U Channel - TV lokal",
-    streamUrl: "https://ams.juraganstreaming.com:5443/LiveApp/streams/uchannel1.m3u8",
-    logoText: "UC",
-    color: "#16a34a",
-    region: "Nasional",
-  },
-  {
-    id: "rrinet",
-    name: "RRI Net",
-    category: "daerah",
-    description: "RRI Net - TV dan radio publik",
-    streamUrl: "https://private-streaming.rri.go.id/memfs/6f77c7b5-feb2-4935-9f89-e7e9fca0a54a_output/master.m3u8",
-    logoText: "RR",
-    color: "#0e7490",
-    region: "Nasional",
-  },
-  {
+      {
     id: "rinjanitv",
     name: "Rinjani TV",
     category: "daerah",

@@ -9,6 +9,7 @@ interface VideoPlayerProps {
   streamUrl: string;
   channelName: string;
   onError?: (error: string) => void;
+  headers?: Record<string, string>;
 }
 
 type StreamType = 'hls' | 'dash' | 'native';
@@ -28,7 +29,7 @@ async function getDashjs() {
   return dashjsModule;
 }
 
-export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProps) {
+export function VideoPlayer({ streamUrl, channelName, onError, headers }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const dashRef = useRef<any>(null); // dashjs MediaPlayer - dynamically loaded
@@ -148,7 +149,7 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
               onError?.('Max retries exceeded');
               return;
             }
-            setError('Koneksi bermasalah. Mencoba menghubungkan kembali...');
+            // Don't show error during auto-retry, keep loading state
           });
 
           player.on(dashjsLib.MediaPlayer.events.PLAYBACK_PLAYING, () => {
@@ -183,6 +184,13 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
           maxMaxBufferLength: 60,
           startLevel: -1,
           progressive: true,
+          xhrSetup: (xhr: XMLHttpRequest, _url: string) => {
+            if (headers) {
+              Object.entries(headers).forEach(([key, value]) => {
+                xhr.setRequestHeader(key, value);
+              });
+            }
+          },
         });
 
         hls.loadSource(streamUrl);
@@ -203,11 +211,10 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
             }
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
-                setError('Koneksi bermasalah. Mencoba menghubungkan kembali...');
+                // Don't show error during auto-retry, just keep loading state
                 hls.startLoad();
                 break;
               case Hls.ErrorTypes.MEDIA_ERROR:
-                setError('Media error. Mencoba memulihkan...');
                 hls.recoverMediaError();
                 break;
               default:

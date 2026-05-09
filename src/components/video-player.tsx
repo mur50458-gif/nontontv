@@ -25,6 +25,7 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
   const [error, setError] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(true);
   const [showOverlay, setShowOverlay] = useState(true);
+  const retryCountRef = useRef(0);
 
   // Adjust state when streamUrl prop changes
   const [prevStreamUrl, setPrevStreamUrl] = useState(streamUrl);
@@ -34,6 +35,11 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
     setError(null);
     setIsPlaying(false);
   }
+
+  // Reset retry count when streamUrl changes
+  useEffect(() => {
+    retryCountRef.current = 0;
+  }, [streamUrl]);
 
   // Show overlay when channelName prop changes
   const [prevChannelName, setPrevChannelName] = useState(channelName);
@@ -107,6 +113,13 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
+          retryCountRef.current += 1;
+          if (retryCountRef.current > 5) {
+            setError('Gagal memuat siaran setelah beberapa percobaan. Silakan coba channel lain.');
+            hls.destroy();
+            onError?.('Max retries exceeded');
+            return;
+          }
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
               setError('Koneksi bermasalah. Mencoba menghubungkan kembali...');
@@ -230,6 +243,7 @@ export function VideoPlayer({ streamUrl, channelName, onError }: VideoPlayerProp
   const retry = useCallback(() => {
     setError(null);
     setIsLoading(true);
+    retryCountRef.current = 0;
     if (hlsRef.current) {
       hlsRef.current.loadSource(streamUrl);
     }

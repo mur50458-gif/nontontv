@@ -1,0 +1,27 @@
+{
+  "name": "NontonTV - Siaran TV Indonesia",
+  "short_name": "NontonTV",
+  "description": "Tonton siaran langsung TV Indonesia kapan saja, di mana saja",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#dc2626",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["entertainment", "lifestyle"],
+  "lang": "id",
+  "dir": "ltr"
+}

@@ -81,6 +81,16 @@ export default function HomePage() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
+  // Show install instructions on mobile after delay
+  useEffect(() => {
+    if (!mounted) return;
+    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    if (isMobile && !deferredPrompt) {
+      const timer = setTimeout(() => setShowInstallPrompt(true), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [mounted, deferredPrompt]);
+
   const handleInstall = async () => {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
@@ -424,34 +434,73 @@ export default function HomePage() {
       {/* PWA Install Banner (mobile) */}
       {mounted && showInstallPrompt && (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-gray-900 border-t border-white/10 p-4 sm:hidden">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Tv className="w-5 h-5 text-white" />
+          {deferredPrompt ? (
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Tv className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-white text-sm font-medium">Install NontonTV</p>
+                  <p className="text-gray-400 text-xs">Tonton TV langsung dari homescreen</p>
+                </div>
               </div>
-              <div>
-                <p className="text-white text-sm font-medium">Install NontonTV</p>
-                <p className="text-gray-400 text-xs">Tonton TV langsung dari homescreen</p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowInstallPrompt(false)}
+                  className="text-gray-500 h-8"
+                >
+                  Nanti
+                </Button>
+                <Button
+                  onClick={handleInstall}
+                  size="sm"
+                  className="bg-red-600 hover:bg-red-700 text-white h-8"
+                >
+                  Install
+                </Button>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowInstallPrompt(false)}
-                className="text-gray-500 h-8"
-              >
-                Nanti
-              </Button>
-              <Button
-                onClick={handleInstall}
-                size="sm"
-                className="bg-red-600 hover:bg-red-700 text-white h-8"
-              >
-                Install
-              </Button>
+          ) : (
+            <div>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Tv className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm font-medium">Install NontonTV di HP</p>
+                    <p className="text-gray-400 text-xs">Buka seperti aplikasi biasa</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowInstallPrompt(false)}
+                  className="text-gray-500 h-8 w-8"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="bg-white/5 rounded-lg p-3 space-y-2">
+                <p className="text-gray-300 text-xs font-medium">Cara install di Android:</p>
+                <div className="flex items-start gap-2">
+                  <span className="text-red-500 text-xs font-bold min-w-[16px]">1.</span>
+                  <p className="text-gray-400 text-xs">Tap ikon <span className="text-white font-medium">⋮</span> (3 titik) di kanan atas Chrome</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-red-500 text-xs font-bold min-w-[16px]">2.</span>
+                  <p className="text-gray-400 text-xs">Pilih <span className="text-white font-medium">&quot;Add to Home screen&quot;</span> atau <span className="text-white font-medium">&quot;Install app&quot;</span></p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-red-500 text-xs font-bold min-w-[16px]">3.</span>
+                  <p className="text-gray-400 text-xs">Tap <span className="text-white font-medium">&quot;Install&quot;</span> — Selesai! 🎉</p>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>

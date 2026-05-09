@@ -1,92 +1,77 @@
----
-Task ID: 1
-Agent: Main
-Task: Build NontonTV - Indonesian TV streaming PWA app
+# Worklog - Task 1: Fix Broken Channel URLs & Enhance PWA
 
-Work Log:
-- Planned architecture: Next.js 16 PWA with HLS streaming
-- Installed hls.js for HLS stream playback
-- Generated app icon using AI image generation
-- Created PWA manifest.json with Indonesian metadata
-- Created service worker (sw.js) with network-first caching
-- Created SW registration component
-- Created channels data with 30+ Indonesian TV channels (nasional, berita, hiburan, anak, olahraga, musik, religi, daerah)
-- Created VideoPlayer component with HLS.js integration, auto-play, error handling, fullscreen, volume control
-- Created ChannelCard component with active state highlighting
-- Created main page with: header, search, category filter tabs, video player, channel grid, footer, PWA install banner
-- Updated layout.tsx with PWA metadata, viewport config, service worker registration
-- Updated next.config.ts with allowedDevOrigins
-- Fixed lint errors (setState in effect)
-- All lint checks pass
+## Date: 2024-03-05
 
-Stage Summary:
-- Full TV streaming PWA app built and running on port 3000
-- 30+ Indonesian TV channels across 8 categories
-- HLS video player with Android 5+ compatibility
-- PWA installable on Android devices
-- Responsive design for mobile and desktop
+## Part 1: Fix Broken Channel URLs in `/home/z/my-project/src/lib/channels.ts`
 
----
-Task ID: 2
-Agent: Main
-Task: Massively expand channel list to include all Indonesian digital TV broadcasts
+### URL Fixes Applied:
+1. **Indosiar** - Changed from `dens.tv/h/h235/index.m3u8` (403) to `indihometv.com/atm/DASH/indosiar/manifest.mpd` and removed headers
+2. **SCTV** - Changed from `dens.tv/h/h217/index.m3u8` (403) to `indihometv.com/atm/DASH/sctv/manifest.mpd` and removed headers
+3. **Moji** - Changed from `dens.tv/h/h207/index.m3u8` (403) to `wahyu1ptv.pages.dev/Moji-HD.m3u8` and removed headers
+4. **Kompas TV** - Changed from `dens.tv/h/h234/index.m3u8` (403) to `wahyu1ptv.pages.dev/KompasTV-HD.m3u8` and removed headers
 
-Work Log:
-- Searched web for comprehensive Indonesian IPTV channel sources
-- Fetched full channel list from iptv-org GitHub (189 channels for Indonesia)
-- Parsed and analyzed all channels by category, region, and stream format
-- Installed dash.js for DASH/MPD stream support (many major channels like GTV, iNews, MNCTV, etc. use DASH)
-- Updated VideoPlayer to support both HLS and DASH streams with dynamic import (to avoid SSR window error)
-- Created comprehensive channels.ts with 196 channels across 12 categories:
-  - Nasional (16): RCTI, SCTV, Indosiar, Trans TV, Trans7, GTV, MNCTV, ANTV, MDTV, Garuda TV, DAAI TV, Elshinta TV, TVRI Nasional, Rajawali TV, Nusantara TV, Moji
-  - Berita (12): Metro TV, tvOne, Kompas TV, iNews, BeritaSatu, CNBC Indonesia, BTV, Jakarta Globe, Magna, BN Channel, Sindo News, Sin Po TV
-  - Hiburan (5): Ficom, Indonesiana.TV, Dens ShowBiz, My Cinema, Channel Jowo
-  - Anak (5): Biznet Kids, Nickelodeon, My Kidz, Kids TV, VTV
-  - Olahraga (1): TVRI Sport
-  - Musik (4): Izzah TV, Madu TV, Music Info Channel, Lingkar TV
-  - Religi (19): Al-Iman, Al-Bahjah, Alwafa Tarim, Madani, Dhamma, Ashiil, DMI, Fajar, I Am Channel, Angel TV, MGI TV, MQTV, MTA TV, Nabawi, Rodja, Salam, Surau, TV MUI, Wesal TV
-  - Daerah (81): All regional channels from Sumatera, Jawa, Kalimantan, Sulawesi, NTT/NTB/Bali/Papua
-  - TVRI (31): All 31 TVRI regional stations (Aceh to Papua Barat)
-  - Gaya Hidup (7): Biznet Adventure/Lifestyle, Dens channels, My Family, Salira TV
-  - Bisnis (3): IDX Channel, MBG TV, TVR Parlemen
-- Updated page.tsx with:
-  - Region filter dropdown (filter by province/wilayah)
-  - View mode toggle (grid/list)
-  - Grouped display by region for daerah and tvri categories
-  - Available regions dynamically computed based on selected category
-  - Footer shows total channel count
-- Updated ChannelCard with compact list mode and MapPin icon for region
-- All lint checks pass, page loads with 200 status
+### Dead Channels Removed:
+1. **Selaparang TV** (id: selaparangtv) - URL returns 404
+2. **Celebes TV** (id: celebestv) - server connection refused
 
-Stage Summary:
-- App now has 196 Indonesian digital TV channels (up from 30+)
-- Added DASH stream support alongside HLS
-- Added region/province filter for easy browsing
-- Added list/grid view toggle
-- Channels grouped by region for daerah and tvri categories
-- 12 categories including new TVRI, Gaya Hidup, Bisnis categories
-- All 34 provinces covered via TVRI regional stations
+### Dens-specific Channels Removed (all 403 with no alternatives):
+1. **Dens ShowBiz** (id: densshowbiz) - from hiburan category
+2. **My Cinema** (id: mycinema) - from hiburan category
+3. **Channel Jowo** (id: channeljowo) - from hiburan category
+4. **Dens Life & Style** (id: denslifestyle) - from gaya_hidup category
+5. **Dens Play** (id: densplay) - from gaya_hidup category
+6. **Dens Food Channel** (id: densfood) - from gaya_hidup category
+7. **My Family** (id: myfamily) - from gaya_hidup category
 
----
-Task ID: 3
-Agent: Main
-Task: Fix broken streaming URLs causing "Koneksi bermasalah" error
+### New Channels Added:
+**Berita category:**
+- BeritaSatu (id: beritasatu) - indihometv DASH
+- Radar Lampung TV (id: radarlampungtv) - radartv.co.id HLS
 
-Work Log:
-- Systematically tested all 184 streaming URLs with curl
-- Found 43 broken URLs: 15 timeout, 14 404, 13 auth-required (403/401), 1 service unavailable
-- Removed 33 channels with unfixable broken URLs (timeout, 404, permanent auth)
-- Added custom headers support to TVChannel interface (optional `headers` field)
-- Added `headers: { "Referer": "https://www.dens.tv/" }` to 11 Dens.tv channels (SCTV, Indosiar, Kompas TV, Moji, Dens ShowBiz, My Cinema, Channel Jowo, Dens Life & Style, Dens Play, Dens Food Channel, My Family)
-- Updated VideoPlayer to pass custom headers via HLS.js xhrSetup configuration
-- Updated page.tsx to pass selectedChannel.headers to VideoPlayer
-- Fixed RCTI URL from dead server to working DASH stream (cdn10jtedge.indihometv.com)
-- Improved error handling: removed error overlay during auto-retry (just shows loading spinner), only shows error after max 5 retries
-- All lint checks pass, page loads with 200 status
+**Daerah category:**
+- RRI Net (id: rrinet) - RRI Visual streaming
 
-Stage Summary:
-- Reduced from 196 → 144 verified working channels
-- Added custom headers support for channels requiring Referer headers (Dens.tv)
-- No more spurious "Koneksi bermasalah" error during auto-retry
-- Major channels now working: SCTV, Indosiar, Kompas TV, Moji (via Referer header), RCTI (via DASH)
-- All remaining channels have tested HTTP 200 responses
+**Hiburan category:**
+- Elshinta TV (id: elshintatv) - juraganstreaming.com HLS
+
+**Note on TVRI channels:** All requested TVRI channels (TVRI World, TVRI Jakarta, TVRI Jawa Barat, TVRI Bangka Belitung, TVRI Gorontalo, TVRI NTB, TVRI Sulawesi Barat, TVRI Papua Barat, TVRI Sulawesi Utara) already existed in the file. No duplicates were added.
+
+### Regions Array Updated:
+- Added "Gorontalo" after "Sulawesi Utara" in the regions array
+
+## Part 2: Enhance PWA for APK-like Install Experience
+
+### 2a. Updated `/home/z/my-project/public/manifest.json`:
+- More comprehensive name and description
+- Added 192x192 icon entry
+- Added separate maskable icon entry
+- Added "news" to categories
+- Added prefer_related_applications: false
+- Added shortcuts section
+- Added scope and screenshots fields
+
+### 2b. Updated `/home/z/my-project/src/app/page.tsx`:
+- Added mobile install instruction useEffect that shows install banner after 5 seconds on mobile when no deferredPrompt is available
+- Replaced the simple PWA install banner with a dual-mode banner:
+  - When deferredPrompt exists: shows original "Install NontonTV" with Install button
+  - When no deferredPrompt: shows step-by-step Android install instructions with dismiss button
+
+### 2c. Updated `/home/z/my-project/src/components/sw-registration.tsx`:
+- Added periodic update checks (every hour)
+- Added updatefound event handler for new service worker detection
+- Added controllerchange event handler for SW takeover with page reload
+
+### 2d. Updated `/home/z/my-project/public/sw.js`:
+- Bumped cache version to v2
+- Added icon-192.png to static assets
+- Added .mpd (DASH manifest) to skip list for stream requests
+- Added cross-origin request filtering to only cache same-origin and specific streaming domains
+- Better stream URL detection
+
+### 2e. Generated New Icons:
+- `/home/z/my-project/public/icon-192.png` - Generated via AI image generation (TV streaming app icon, red/dark theme)
+- `/home/z/my-project/public/icon-512.png` - Regenerated to match the new icon design
+
+## Lint Check:
+- All files pass `bun run lint` with no errors
+- Dev server compiles successfully

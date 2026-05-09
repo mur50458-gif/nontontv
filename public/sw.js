@@ -1,7 +1,8 @@
-const CACHE_NAME = 'nontontv-v1';
+const CACHE_NAME = 'nontontv-v2';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
+  '/icon-192.png',
   '/icon-512.png',
 ];
 
@@ -34,9 +35,18 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') return;
 
-  // Skip HLS streams - always fetch fresh
+  // Skip HLS/DASH streams - always fetch fresh
   if (event.request.url.includes('.m3u8')) return;
   if (event.request.url.includes('.ts')) return;
+  if (event.request.url.includes('.mpd')) return;
+
+  // Skip cross-origin stream requests
+  const url = new URL(event.request.url);
+  if (url.hostname !== self.location.hostname && 
+      !event.request.url.includes('tvri.go.id') &&
+      !event.request.url.includes('indihometv.com')) {
+    return;
+  }
 
   event.respondWith(
     fetch(event.request)

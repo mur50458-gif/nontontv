@@ -75,3 +75,27 @@
 ## Lint Check:
 - All files pass `bun run lint` with no errors
 - Dev server compiles successfully
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix auto-update channels, test, and deploy to Vercel
+
+Work Log:
+- Analyzed current channel data and identified issues (broken URLs, missing channels)
+- Fetched latest iptv-org Indonesia M3U (190 channels)
+- Rewrote /api/channels/route.ts to return fully categorized channel data from iptv-org
+- Added smart deduplication (prefer higher quality), proper EXTVLCOPT header support
+- Fixed category detection: ANTV, Rajawali TV now correctly in "nasional", SPOTV in "olahraga"
+- Fixed region mapping for English province names (North Sulawesi, West Java, etc.)
+- Updated use-auto-update-channels.ts to use API as primary source with static fallback
+- Updated static channels.ts with 30+ new channels and latest URLs
+- Tested stream URLs - most major channels return HTTP 200
+- Pushed to GitHub and deployed to Vercel successfully
+- Production API verified: 177 channels across 11 categories
+
+Stage Summary:
+- Live at https://tvherman.vercel.app with 177 auto-updated channels
+- API fetches from iptv-org every 15 minutes with server-side caching
+- Static channels serve as fallback when API is unavailable
+- New channels added: ANTV, Rajawali TV, SPOTV, SPOTV 2, Balikpapan TV, Atambua TV, Jambi TV, Puja TV Aceh, Rakyat Bengkulu TV, Tegar TV Lampung, PJTV, Selaparang TV, Celebes TV, Fajar TV, Sultra TV, Simpang5 TV, Online TV Nusantara, MGS TV, Sangaji TV, VTV, UBTV Brawijaya, Kids TV, Ananda, UChannel, Ashiil TV, Wesal TV, Surau TV, Allegro, BTV, Jakarta Globe News, IDTV, BeritaSatu (new URL), TVR Parlemen (new URL), Jawa Pos TV Bali/Magelang, TVRI DKI Jakarta, TVRI World, TVRI Jawa Timur, RCTI (SD), DMI TV, I Am Channel

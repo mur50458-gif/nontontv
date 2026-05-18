@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect, useCallback, useSyncExternalStore, useRef } from 'react';
 import { VideoPlayer } from '@/components/video-player';
 import { ChannelCard } from '@/components/channel-card';
-import { channels, categories, regions, TVChannel } from '@/lib/channels';
+import { categories, regions, TVChannel } from '@/lib/channels';
+import { useAutoUpdateChannels } from '@/hooks/use-auto-update-channels';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +41,8 @@ import {
   ChevronDown,
   Radio,
   ListOrdered,
+  RefreshCw,
+  CheckCircle2,
 } from 'lucide-react';
 
 // Online status via useSyncExternalStore (avoids hydration mismatch)
@@ -72,6 +75,8 @@ function getMountedServerSnapshot() {
 type ViewMode = 'grid' | 'list';
 
 export default function HomePage() {
+  // Auto-updating channels from iptv-org
+  const { channels, updatedCount, newCount, updatedAt, isUpdating, lastError } = useAutoUpdateChannels();
   const [selectedChannel, setSelectedChannel] = useState<TVChannel>(channels[0]);
   const [activeCategory, setActiveCategory] = useState('semua');
   const [activeRegion, setActiveRegion] = useState('Semua Wilayah');
@@ -134,7 +139,7 @@ export default function HomePage() {
       );
     }
     return result;
-  }, [activeCategory, activeRegion, searchQuery]);
+  }, [channels, activeCategory, activeRegion, searchQuery]);
 
   // Group channels by region for the "daerah" and "tvri" categories
   const groupedByRegion = useMemo(() => {
@@ -203,7 +208,7 @@ export default function HomePage() {
     }
     const regionSet = new Set(relevant.map((ch) => ch.region));
     return ['Semua Wilayah', ...regions.filter((r) => regionSet.has(r))];
-  }, [activeCategory]);
+  }, [channels, activeCategory]);
 
   const categoryName = activeCategory === 'semua'
     ? 'Semua Channel'
@@ -265,6 +270,17 @@ export default function HomePage() {
                 <Download className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Install</span>
               </Button>
+            )}
+
+            {/* Auto-update indicator */}
+            {mounted && updatedAt && (
+              <div className="flex items-center gap-1" title={`Terakhir update: ${new Date(updatedAt).toLocaleString('id-ID')}`}>
+                {isUpdating ? (
+                  <RefreshCw className="w-3 h-3 text-yellow-400 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-3 h-3 text-green-400" />
+                )}
+              </div>
             )}
 
             {/* Online Status */}
@@ -588,7 +604,7 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             <Tv className="w-4 h-4 text-red-500" />
             <span className="text-gray-500 text-xs">
-              NontonTV © {new Date().getFullYear()} — {channels.length} Siaran TV Digital Indonesia Langsung
+              NontonTV © {new Date().getFullYear()} — {channels.length} Channel • Auto-update dari iptv-org
             </span>
           </div>
           <p className="text-gray-600 text-xs">

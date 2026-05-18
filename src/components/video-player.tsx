@@ -8,6 +8,7 @@ import { Volume2, VolumeX, Maximize, Minimize, Play, Pause, Loader2, AlertCircle
 interface VideoPlayerProps {
   streamUrl: string;
   channelName: string;
+  youtubeUrl?: string;
   onError?: (error: string) => void;
   headers?: Record<string, string>;
 }
@@ -29,7 +30,86 @@ async function getDashjs() {
   return dashjsModule;
 }
 
-export function VideoPlayer({ streamUrl, channelName, onError, headers }: VideoPlayerProps) {
+export function VideoPlayer({ streamUrl, channelName, youtubeUrl, onError, headers }: VideoPlayerProps) {
+  // If youtubeUrl is provided, render YouTube embed instead
+  if (youtubeUrl) {
+    return <YouTubeEmbed url={youtubeUrl} channelName={channelName} />;
+  }
+
+  return <NativePlayer streamUrl={streamUrl} channelName={channelName} onError={onError} headers={headers} />;
+}
+
+// ─── YouTube Embed Component ────────────────────────────────────────────────
+
+function YouTubeEmbed({ url, channelName }: { url: string; channelName: string }) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!containerRef.current) return;
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else {
+      await containerRef.current.requestFullscreen();
+    }
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative bg-black rounded-xl overflow-hidden"
+      style={{ aspectRatio: '16/9' }}
+    >
+      <iframe
+        src={url}
+        className="w-full h-full"
+        allow="autoplay; encrypted-media; fullscreen"
+        allowFullScreen
+        title={`${channelName} - YouTube Live`}
+        style={{ border: 'none' }}
+      />
+
+      {/* Channel Name Overlay */}
+      <div className="absolute top-4 left-4 pointer-events-none">
+        <div className="bg-black/70 backdrop-blur-sm rounded-lg px-3 py-1.5">
+          <p className="text-white font-semibold text-sm">{channelName}</p>
+        </div>
+      </div>
+
+      {/* LIVE Badge */}
+      <div className="absolute top-4 right-4 pointer-events-none">
+        <div className="bg-red-600 rounded-md px-2 py-0.5 flex items-center gap-1.5">
+          <Radio className="w-3 h-3 text-white" />
+          <span className="text-white text-xs font-bold">LIVE</span>
+        </div>
+      </div>
+
+      {/* Fullscreen button */}
+      <div className="absolute bottom-4 right-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleFullscreen}
+          className="text-white hover:bg-white/10 h-9 w-9 bg-black/40"
+        >
+          {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Native HLS/DASH Player ─────────────────────────────────────────────────
+
+function NativePlayer({ streamUrl, channelName, onError, headers }: Omit<VideoPlayerProps, 'youtubeUrl'>) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const dashRef = useRef<any>(null); // dashjs MediaPlayer - dynamically loaded

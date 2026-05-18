@@ -127,10 +127,21 @@ function ChannelRow({
             >
               {/* Thumbnail area */}
               <div
-                className="h-[80px] sm:h-[90px] flex items-center justify-center relative"
+                className="h-[80px] sm:h-[90px] flex items-center justify-center relative overflow-hidden"
                 style={{ backgroundColor: channel.color }}
               >
-                <span className="text-white text-xl sm:text-2xl font-bold select-none">
+                {channel.logo ? (
+                  <img
+                    src={channel.logo}
+                    alt={channel.name}
+                    className="w-full h-full object-contain p-2"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                    }}
+                  />
+                ) : null}
+                <span className={`text-white text-xl sm:text-2xl font-bold select-none ${channel.logo ? 'hidden' : ''}`}>
                   {channel.logoText}
                 </span>
                 {isActive && (
@@ -402,6 +413,7 @@ export default function HomePage() {
               <VideoPlayer
                 streamUrl={selectedChannel.streamUrl}
                 channelName={selectedChannel.name}
+                youtubeUrl={selectedChannel.youtubeUrl}
                 onError={handleError}
                 headers={selectedChannel.headers}
               />
@@ -413,10 +425,21 @@ export default function HomePage() {
               <div className="bg-[#1a1a1a] rounded-xl p-4">
                 <div className="flex items-center gap-3">
                   <div
-                    className="w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold text-white flex-shrink-0"
+                    className="w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold text-white flex-shrink-0 overflow-hidden"
                     style={{ backgroundColor: selectedChannel.color }}
                   >
-                    {selectedChannel.logoText}
+                    {selectedChannel.logo ? (
+                      <img
+                        src={selectedChannel.logo}
+                        alt={selectedChannel.name}
+                        className="w-full h-full object-contain p-1"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      selectedChannel.logoText
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -485,10 +508,14 @@ export default function HomePage() {
                       }`}
                     >
                       <div
-                        className="w-8 h-8 rounded-md flex items-center justify-center text-[10px] font-bold text-white"
+                        className="w-8 h-8 rounded-md flex items-center justify-center text-[10px] font-bold text-white overflow-hidden"
                         style={{ backgroundColor: ch.color }}
                       >
-                        {ch.logoText}
+                        {ch.logo ? (
+                          <img src={ch.logo} alt={ch.name} className="w-full h-full object-contain p-0.5" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        ) : (
+                          ch.logoText
+                        )}
                       </div>
                       <span className="text-[9px] text-gray-400 truncate w-full text-center">{ch.name}</span>
                     </button>

@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
 
-// In-memory cache
-let cachedData: { channels: TVChannelData[]; updatedAt: string; totalFromSource: number } | null = null;
-let cacheTime = 0;
-const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+// ─── Data Types ──────────────────────────────────────────────────────────────
 
 interface TVChannelData {
   id: string;
@@ -11,12 +8,15 @@ interface TVChannelData {
   category: string;
   description: string;
   streamUrl: string;
+  youtubeUrl?: string;
   logoText: string;
   color: string;
   region: string;
+  logo?: string;
   headers?: Record<string, string>;
   quality?: string;
   isNot247?: boolean;
+  isGeoBlocked?: boolean;
 }
 
 interface ParsedChannel {
@@ -24,29 +24,81 @@ interface ParsedChannel {
   streamUrl: string;
   headers?: Record<string, string>;
   tvgId: string;
+  tvgLogo: string;
   quality: string;
   isNot247: boolean;
+  isGeoBlocked: boolean;
 }
 
-const IPTV_ORG_URL = 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/id.m3u';
+// ─── Cache ───────────────────────────────────────────────────────────────────
 
-// Supplementary channels NOT in iptv-org but known to work
+let cachedData: { channels: TVChannelData[]; updatedAt: string; totalFromSource: number } | null = null;
+let cacheTime = 0;
+const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+
+// ─── URLs ────────────────────────────────────────────────────────────────────
+
+const IPTV_ORG_PRIMARY = 'https://raw.githubusercontent.com/iptv-org/iptv/gh-pages/countries/id.m3u';
+const IPTV_ORG_FALLBACK = 'https://iptv-org.github.io/iptv/countries/id.m3u';
+
+// ─── YouTube Live IDs for major Indonesian channels ─────────────────────────
+
+const YOUTUBE_LIVE_IDS: Record<string, string> = {
+  'metro tv': 'AUE5iHINUIw',
+  'metrotv': 'AUE5iHINUIw',
+  'tvone': 'yNKvkPJl-tg',
+  'tv one': 'yNKvkPJl-tg',
+  'kompas tv': 'DOOrIxw5xOw',
+  'kompastv': 'DOOrIxw5xOw',
+  'cnn indonesia': 'qbxprL02jWk',
+  'cnnindonesia': 'qbxprL02jWk',
+};
+
+function getYoutubeUrl(name: string): string | undefined {
+  const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const [pattern, videoId] of Object.entries(YOUTUBE_LIVE_IDS)) {
+    const normalizedPattern = pattern.replace(/[^a-z0-9]/g, '');
+    if (key === normalizedPattern || key.includes(normalizedPattern)) {
+      return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&playsinline=1`;
+    }
+  }
+  return undefined;
+}
+
+// ─── Supplementary channels NOT in iptv-org but known to work ───────────────
+
 const SUPPLEMENTARY_CHANNELS: TVChannelData[] = [
-  { id: "sctv", name: "SCTV", category: "nasional", description: "SCTV - TV swasta nasional", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/sctv/manifest.mpd", logoText: "SC", color: "#dc2626", region: "Nasional" },
+  { id: "sctv", name: "SCTV", category: "nasional", description: "SCTV - TV swasta nasional", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/sctv/manifest.mpd", logoText: "SC", color: "#ea580c", region: "Nasional" },
   { id: "indosiar", name: "Indosiar", category: "nasional", description: "Indosiar - TV hiburan dan informasi", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/indosiar/manifest.mpd", logoText: "IS", color: "#f59e0b", region: "Nasional" },
-  { id: "kompastv", name: "Kompas TV", category: "berita", description: "Kompas TV - TV berita terpercaya", streamUrl: "https://wahyu1ptv.pages.dev/KompasTV-HD.m3u8", logoText: "KT", color: "#1d4ed8", region: "Nasional" },
-  { id: "mojitv", name: "Moji", category: "nasional", description: "Moji - TV hiburan dan gaya hidup", streamUrl: "https://wahyu1ptv.pages.dev/Moji-HD.m3u8", logoText: "MJ", color: "#e11d48", region: "Nasional" },
+  { id: "gtv", name: "GTV", category: "nasional", description: "GTV - Stasiun TV nasional MNC Group", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/globaltv/manifest.mpd", logoText: "GT", color: "#7c3aed", region: "Nasional" },
+  { id: "mnctv", name: "MNC TV", category: "nasional", description: "MNC TV - TV nasional", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/mnctv/manifest.mpd", logoText: "MN", color: "#ea580c", region: "Nasional" },
+  { id: "inews", name: "iNews", category: "berita", description: "iNews - TV berita MNC Group", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/inews/manifest.mpd", logoText: "iN", color: "#ea580c", region: "Nasional" },
+  { id: "idxchannel", name: "IDX Channel", category: "bisnis", description: "IDX Channel - TV pasar modal dan investasi", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/idx/manifest.mpd", logoText: "IX", color: "#1d4ed8", region: "Nasional" },
+  { id: "jtv", name: "JTV Surabaya", category: "daerah", description: "JTV - TV lokal Surabaya", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/jtv/manifest.mpd", logoText: "JV", color: "#ea580c", region: "Jawa Timur" },
+  { id: "jaktv", name: "Jak TV", category: "daerah", description: "Jak TV - TV lokal Jakarta", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/JAK_TV/manifest.mpd", logoText: "JK", color: "#0284c7", region: "DKI Jakarta" },
+  { id: "balitv", name: "Bali TV", category: "daerah", description: "Bali TV - TV lokal Bali", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/balitv/manifest.mpd", logoText: "BL", color: "#f59e0b", region: "Bali" },
+  { id: "mtatv", name: "MTA TV", category: "religi", description: "MTA TV - TV Islam Ahmadiyya", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/mtatv/manifest.mpd", logoText: "MT", color: "#065f46", region: "Nasional" },
+  { id: "mykidz", name: "My Kidz", category: "nasional", description: "My Kidz - Channel anak-anak", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/mykids/manifest.mpd", logoText: "MK", color: "#ec4899", region: "Nasional" },
+  { id: "sinpotv", name: "Sin Po TV", category: "berita", description: "Sin Po TV - TV berita dan olahraga", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/sinpotv/manifest.mpd", logoText: "SP", color: "#9333ea", region: "Nasional" },
+  { id: "sindonews", name: "Sindo News TV", category: "berita", description: "Sindo News TV - TV berita MNC Group", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/mncnews/manifest.mpd", logoText: "SN", color: "#b91c1c", region: "Nasional" },
   { id: "nickelodeon", name: "Nickelodeon", category: "nasional", description: "Nickelodeon Asia - TV anak dan kartun", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/nickelodeon/manifest.mpd", logoText: "NK", color: "#f59e0b", region: "Nasional" },
+  { id: "metrotv", name: "Metro TV", category: "berita", description: "Metro TV - Stasiun TV berita pertama di Indonesia", streamUrl: "https://edge.medcom.id/live-edge/smil:metro.smil/playlist.m3u8", youtubeUrl: "https://www.youtube.com/embed/AUE5iHINUIw?autoplay=1&mute=1&playsinline=1", logoText: "MT", color: "#0284c7", region: "Nasional" },
+  { id: "kompastv", name: "Kompas TV", category: "berita", description: "Kompas TV - TV berita terpercaya", streamUrl: "https://wahyu1ptv.pages.dev/KompasTV-HD.m3u8", youtubeUrl: "https://www.youtube.com/embed/DOOrIxw5xOw?autoplay=1&mute=1&playsinline=1", logoText: "KT", color: "#1d4ed8", region: "Nasional" },
+  { id: "beritasatu", name: "BeritaSatu", category: "berita", description: "BeritaSatu - TV berita 24 jam", streamUrl: "https://beritasatu.secureswiftcontent.com/han/beritasatu/bsatu10008r/srtoutput/manifest.m3u8", logoText: "BS", color: "#0e7490", region: "Nasional" },
+  { id: "btv", name: "BTV", category: "berita", description: "BTV - TV berita Indonesia", streamUrl: "https://btv.secureswiftcontent.com/han/btv/btv10005r/srtoutput/manifest.m3u8", logoText: "BV", color: "#dc2626", region: "Nasional" },
+  { id: "cnbcindonesia", name: "CNBC Indonesia", category: "berita", description: "CNBC Indonesia - TV berita bisnis dan pasar modal", streamUrl: "https://live.cnbcindonesia.com/livecnbc/smil:cnbctv.smil/master.m3u8", logoText: "CB", color: "#0e7490", region: "Nasional" },
+  { id: "cnnindonesia", name: "CNN Indonesia", category: "berita", description: "CNN Indonesia - TV berita 24 jam", streamUrl: "https://live.cnnindonesia.com/livecnbc/smil:cnbctv.smil/master.m3u8", youtubeUrl: "https://www.youtube.com/embed/qbxprL02jWk?autoplay=1&mute=1&playsinline=1", logoText: "CI", color: "#dc2626", region: "Nasional" },
+  { id: "jakartaglobe", name: "Jakarta Globe News", category: "berita", description: "Jakarta Globe News Channel", streamUrl: "https://jktglobe.secureswiftcontent.com/han/jktglobe/jktglober/srtoutput/manifest.m3u8", logoText: "JG", color: "#0284c7", region: "Nasional" },
   { id: "saliratv", name: "Salira TV", category: "gaya_hidup", description: "Salira TV - TV budaya dan gaya hidup Sunda", streamUrl: "https://live.salira.tv/p/3870/hybrid/play.m3u8", logoText: "SA", color: "#0e7490", region: "Jawa Barat" },
   { id: "allegro", name: "Allegro", category: "gaya_hidup", description: "Allegro - Channel gaya hidup", streamUrl: "https://vodcdn.bamboo-cloud.com/livehls/68c525e1063044539b09c253/master.m3u8", logoText: "AL", color: "#7c3aed", region: "Nasional", headers: { "http-referrer": "https://allegrotelkomvision.renderforestsites.com/" } },
-  { id: "idxchannel", name: "IDX Channel", category: "bisnis", description: "IDX Channel - TV pasar modal dan investasi", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/idx/manifest.mpd", logoText: "IX", color: "#1d4ed8", region: "Nasional" },
   { id: "tvrparlemen", name: "TVR Parlemen", category: "bisnis", description: "TVR Parlemen - TV parlemen Indonesia", streamUrl: "https://ssv1.dpr.go.id/golive/livestream/playlist.m3u8", logoText: "VP", color: "#0e7490", region: "Nasional" },
   { id: "tvrisport", name: "TVRI Sport", category: "olahraga", description: "TVRI Sport - Channel olahraga Indonesia", streamUrl: "https://ott-balancer.tvri.go.id/live/eds/SportHD/hls/SportHD.m3u8", logoText: "TS", color: "#dc2626", region: "Nasional" },
-  { id: "angel_tv", name: "Angel TV", category: "religi", description: "Angel TV Indonesia - TV Kristiani", streamUrl: "https://janya-digimix.akamaized.net/vglive-sk-234616/indonesia/ngrp:angelindonesia_all/playlist.m3u8", logoText: "AG", color: "#7c3aed", region: "Nasional" },
+  { id: "angeltv", name: "Angel TV", category: "religi", description: "Angel TV Indonesia - TV Kristiani", streamUrl: "https://janya-digimix.akamaized.net/vglive-sk-234616/indonesia/ngrp:angelindonesia_all/playlist.m3u8", logoText: "AG", color: "#7c3aed", region: "Nasional" },
   { id: "iamchannel", name: "I Am Channel", category: "religi", description: "I Am Channel - TV Kristiani Indonesia", streamUrl: "https://61146e7ab7a66.streamlock.net:8089/tes/1/chunklist.m3u8", logoText: "IA", color: "#0369a1", region: "Nasional", headers: { "http-referrer": "https://iamchannel.org/" } },
 ];
 
-// ---- Parsing ----
+// ─── M3U Parsing ─────────────────────────────────────────────────────────────
+
 function parseM3U(m3uText: string): ParsedChannel[] {
   const lines = m3uText.split('\n');
   const seen = new Map<string, ParsedChannel>();
@@ -59,11 +111,36 @@ function parseM3U(m3uText: string): ParsedChannel[] {
       continue;
     }
 
+    // Parse EXTINF line
     const tvgIdMatch = line.match(/tvg-id="([^"]*)"/);
     const tvgId = tvgIdMatch?.[1] || '';
-    const nameMatch = line.match(/,(.+)$/);
-    const rawName = nameMatch?.[1]?.trim() || '';
+    const tvgLogoMatch = line.match(/tvg-logo="([^"]*)"/);
+    const tvgLogo = tvgLogoMatch?.[1] || '';
 
+    // Extract name: find the LAST comma that appears after all quoted attributes.
+    // The M3U format puts channel name after the last comma, but http-user-agent
+    // attributes can contain commas (e.g., "KHTML, like Gecko"), so we need to
+    // handle that by finding the last comma that comes after the group-title attribute.
+    // Strategy: find group-title="..." and take everything after the last comma following it.
+    const groupTitleMatch = line.match(/group-title="[^"]*"/);
+    let rawName = '';
+    if (groupTitleMatch) {
+      const afterGroupTitle = line.substring(groupTitleMatch.index! + groupTitleMatch[0].length);
+      const commaIdx = afterGroupTitle.indexOf(',');
+      if (commaIdx >= 0) {
+        rawName = afterGroupTitle.substring(commaIdx + 1).trim();
+      }
+    }
+    // Fallback: if no group-title found, use the last comma approach
+    if (!rawName) {
+      // Find the last comma that's not inside quotes
+      const lastCommaIdx = line.lastIndexOf(',');
+      if (lastCommaIdx >= 0) {
+        rawName = line.substring(lastCommaIdx + 1).trim();
+      }
+    }
+
+    // Clean name - remove quality tags, not 24/7 markers, geo-blocked markers
     const cleanName = rawName
       .replace(/\s*\(\d{3,4}[ip]\)\s*/g, '')
       .replace(/\s*\(\d{3,4}i\)\s*/g, '')
@@ -75,7 +152,9 @@ function parseM3U(m3uText: string): ParsedChannel[] {
     const qualityMatch = rawName.match(/\((\d{3,4}[ip])\)/);
     const quality = qualityMatch?.[1] || '';
     const isNot247 = rawName.includes('[Not 24/7]');
+    const isGeoBlocked = rawName.includes('[Geo-blocked]');
 
+    // Parse EXTVLCOPT headers
     const headers: Record<string, string> = {};
     let j = i + 1;
     while (j < lines.length && lines[j].trim().startsWith('#EXTVLCOPT:')) {
@@ -90,6 +169,7 @@ function parseM3U(m3uText: string): ParsedChannel[] {
       j++;
     }
 
+    // Find stream URL
     let streamUrl = '';
     while (j < lines.length) {
       const urlLine = lines[j].trim();
@@ -103,12 +183,14 @@ function parseM3U(m3uText: string): ParsedChannel[] {
 
     if (streamUrl && cleanName) {
       const normalizedName = cleanName.toLowerCase().replace(/[\s\-_.]/g, '');
-      
+
       const existing = seen.get(normalizedName);
       const qualityScore = getQualityScore(quality);
       const existingScore = existing ? getQualityScore(existing.quality) : 0;
-      
-      if (!existing || qualityScore > existingScore || 
+
+      // Keep the best quality version; prefer non-geo-blocked over geo-blocked
+      if (!existing || qualityScore > existingScore ||
+          (qualityScore === existingScore && !isGeoBlocked && existing.isGeoBlocked) ||
           (qualityScore === existingScore && !isNot247 && existing.isNot247) ||
           (qualityScore === existingScore && Object.keys(headers).length > 0 && !existing.headers)) {
         seen.set(normalizedName, {
@@ -116,8 +198,10 @@ function parseM3U(m3uText: string): ParsedChannel[] {
           streamUrl,
           headers: Object.keys(headers).length > 0 ? headers : undefined,
           tvgId,
+          tvgLogo,
           quality,
           isNot247,
+          isGeoBlocked,
         });
       }
     }
@@ -134,15 +218,18 @@ function getQualityScore(quality: string): number {
   return parseInt(match[1]);
 }
 
-// ---- Categorization ----
+// ─── Categorization ──────────────────────────────────────────────────────────
+
 function guessCategory(name: string, tvgId: string): string {
   const n = name.toLowerCase();
   const id = tvgId.toLowerCase();
 
+  // TVRI channels (except sport)
   if (id.includes('tvri') || (n.includes('tvri') && !n.includes('sport'))) return 'tvri';
   if (n.includes('tvri') && n.includes('sport')) return 'olahraga';
 
-  const nationalKeywords = ['rcti', 'sctv', 'indosiar', 'trans7', 'trans tv', 'gtv', 'mnc', 'mdtv', 'garuda', 'daai',
+  // National channels
+  const nationalKeywords = ['rcti', 'sctv', 'indosiar', 'trans7', 'trans tv', 'gtv', 'mnc tv', 'mnctv', 'mdtv', 'garuda', 'daai',
     'nusantara tv', 'moji', 'antv', 'rajawali tv', 'nickelodeon', 'my kidz'];
   for (const kw of nationalKeywords) {
     if (n.includes(kw)) return 'nasional';
@@ -154,15 +241,36 @@ function guessCategory(name: string, tvgId: string): string {
     if (tvgId.includes(kw)) return 'nasional';
   }
 
+  // Sports
   if (n.includes('sport') || n.includes('spotv') || id.toLowerCase().includes('spotv')) return 'olahraga';
+
+  // Kids
   if (n.includes('kids') || n.includes('kidz') || n.includes('ananda')) return 'anak';
+
+  // Music
   if (n.includes('music') || n.includes('musik') || n.includes('madu') || n.includes('izzah') || n.includes('lingkar')) return 'musik';
-  if (n.includes('dakwah') || n.includes('islam') || n.includes('al-') || n.includes('rodja') || n.includes('mqtv') || n.includes('mta') || n.includes('dhamma') || n.includes('angel') || n.includes('wesal') || n.includes('salam') || n.includes('nabawi') || n.includes('madani') || n.includes('ashiil') || n.includes('mui') || n.includes('surau')) return 'religi';
-  if (n.includes('berita') || n.includes('news') || n.includes('cnbc') || n.includes('kompas') || n.includes('metro') || n.includes('sindo') || n.includes('magna') || n.includes('btv') || n.includes('jakarta globe') || n.includes('beritasatu') || n.includes('sinpo') || n.includes('radar') || n.includes('one') || n.includes('idtv')) return 'berita';
+
+  // Religious
+  if (n.includes('dakwah') || n.includes('islam') || n.includes('al-') || n.includes('rodja') || n.includes('mqtv') || n.includes('mta') ||
+      n.includes('dhamma') || n.includes('angel') || n.includes('wesal') || n.includes('salam') || n.includes('nabawi') ||
+      n.includes('madani') || n.includes('ashiil') || n.includes('mui') || n.includes('surau') || n.includes('tawaf') ||
+      n.includes('bahjah') || n.includes('imantv')) return 'religi';
+
+  // News
+  if (n.includes('berita') || n.includes('news') || n.includes('cnbc') || n.includes('cnn') || n.includes('kompas') || n.includes('metro') ||
+      n.includes('sindo') || n.includes('magna') || n.includes('btv') || n.includes('jakarta globe') || n.includes('beritasatu') ||
+      n.includes('sinpo') || n.includes('radar') || n.includes('tvone') || n.includes('idtv') || n.includes('one')) return 'berita';
+
+  // Business
   if (n.includes('biznet') || n.includes('idx') || n.includes('parlemen') || n.includes('mbg')) return 'bisnis';
+
+  // Lifestyle
   if (n.includes('lifestyle') || n.includes('gaya') || n.includes('salira') || n.includes('allegro')) return 'gaya_hidup';
+
+  // Entertainment
   if (n.includes('ficom') || n.includes('indonesiana') || n.includes('elshinta') || n.includes('u channel') || n.includes('utv') || id.includes('UChannel')) return 'hiburan';
 
+  // Regional channels
   const regionKeywords = ['bandung', 'jogja', 'yogya', 'semarang', 'surabaya', 'bali', 'banjar', 'batam', 'banten',
     'pontianak', 'samarinda', 'padang', 'riau', 'makassar', 'manado', 'kawanua', 'jambi', 'balikpapan',
     'banyumas', 'caruban', 'dhoho', 'duta', 'jtv', 'jek', 'matrix', 'kilisuci', 'astro blitar',
@@ -182,7 +290,8 @@ function guessCategory(name: string, tvgId: string): string {
   return 'daerah';
 }
 
-// ---- Region mapping ----
+// ─── Region Mapping ──────────────────────────────────────────────────────────
+
 function guessRegion(name: string, tvgId: string): string {
   const n = name.toLowerCase();
   const id = tvgId.toLowerCase();
@@ -227,6 +336,7 @@ function guessRegion(name: string, tvgId: string): string {
     }
   }
 
+  // TVRI region mapping from tvg-id
   if (id.includes('tvri')) {
     const tvgIdRegionMap: Record<string, string> = {
       'Aceh': 'Aceh', 'Sumut': 'Sumatera Utara', 'Sumbar': 'Sumatera Barat',
@@ -251,7 +361,8 @@ function guessRegion(name: string, tvgId: string): string {
   return 'Nasional';
 }
 
-// ---- Generate metadata ----
+// ─── Generate Metadata ──────────────────────────────────────────────────────
+
 function generateLogoText(name: string): string {
   const words = name.replace(/[^a-zA-Z0-9\s]/g, '').split(/\s+/).filter(Boolean);
   if (words.length >= 2) {
@@ -295,7 +406,8 @@ function generateId(name: string, tvgId: string): string {
   return name.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
 }
 
-// ---- Build channel data ----
+// ─── Build Channel Data ─────────────────────────────────────────────────────
+
 function buildChannels(parsed: ParsedChannel[]): TVChannelData[] {
   const seenIds = new Map<string, TVChannelData>();
 
@@ -308,31 +420,36 @@ function buildChannels(parsed: ParsedChannel[]): TVChannelData[] {
     const id = generateId(ch.name, ch.tvgId);
     const category = guessCategory(ch.name, ch.tvgId);
     const region = guessRegion(ch.name, ch.tvgId);
-    
+
     // Skip if supplementary channel with same base name exists
     const baseName = ch.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const isSupplemented = SUPPLEMENTARY_CHANNELS.some(sup => 
+    const isSupplemented = SUPPLEMENTARY_CHANNELS.some(sup =>
       sup.name.toLowerCase().replace(/[^a-z0-9]/g, '') === baseName
     );
     if (isSupplemented) continue;
-    
+
     const existing = seenIds.get(id);
     const newQualityScore = getQualityScore(ch.quality);
     const existingQualityScore = existing ? getQualityScore(existing.quality || '') : 0;
-    
+
     if (!existing || newQualityScore > existingQualityScore) {
+      const youtubeUrl = getYoutubeUrl(ch.name);
+
       seenIds.set(id, {
         id,
         name: ch.name,
         category,
         description: generateDescription(ch.name, category, region, ch.quality),
         streamUrl: ch.streamUrl,
+        youtubeUrl,
         logoText: generateLogoText(ch.name),
         color: generateColor(ch.name),
         region,
+        logo: ch.tvgLogo || undefined,
         headers: ch.headers,
         quality: ch.quality,
         isNot247: ch.isNot247,
+        isGeoBlocked: ch.isGeoBlocked,
       });
     }
   }
@@ -349,21 +466,48 @@ function buildChannels(parsed: ParsedChannel[]): TVChannelData[] {
   });
 }
 
+// ─── Fetch with Fallback ────────────────────────────────────────────────────
+
+async function fetchM3U(): Promise<string> {
+  // Try primary URL first
+  try {
+    const response = await fetch(IPTV_ORG_PRIMARY, {
+      next: { revalidate: 900 },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (response.ok) {
+      return await response.text();
+    }
+  } catch {
+    // Primary failed, try fallback
+  }
+
+  // Try fallback URL
+  try {
+    const response = await fetch(IPTV_ORG_FALLBACK, {
+      next: { revalidate: 900 },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (response.ok) {
+      return await response.text();
+    }
+  } catch {
+    // Fallback also failed
+  }
+
+  throw new Error('Failed to fetch M3U from both primary and fallback URLs');
+}
+
+// ─── API Route ───────────────────────────────────────────────────────────────
+
 export async function GET() {
+  // Return cached data if still fresh
   if (cachedData && Date.now() - cacheTime < CACHE_DURATION) {
     return NextResponse.json(cachedData);
   }
 
   try {
-    const response = await fetch(IPTV_ORG_URL, {
-      next: { revalidate: 900 },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch: ${response.status}`);
-    }
-
-    const m3uText = await response.text();
+    const m3uText = await fetchM3U();
     const totalFromSource = (m3uText.match(/#EXTINF/g) || []).length;
     const parsed = parseM3U(m3uText);
     const channels = buildChannels(parsed);
@@ -377,10 +521,14 @@ export async function GET() {
 
     return NextResponse.json(cachedData);
   } catch (error) {
+    console.error('Failed to fetch channels from iptv-org:', error);
+
+    // Return cached data if available (even if stale)
     if (cachedData) {
       return NextResponse.json(cachedData);
     }
-    // Fallback: return supplementary channels
+
+    // Final fallback: return supplementary channels
     return NextResponse.json({
       channels: SUPPLEMENTARY_CHANNELS,
       updatedAt: new Date().toISOString(),

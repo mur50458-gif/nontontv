@@ -20,3 +20,36 @@ Stage Summary:
 - All 10 major channels working: RCTI, SCTV, Indosiar, Trans TV, Trans7, GTV, Metro TV, tvOne, Kompas TV, Moji
 - Auto-update every 15 minutes from iptv-org GitHub source
 - Production URL: https://tvherman.vercel.app
+
+---
+Task ID: 1 (Phase 2)
+Agent: Main Agent
+Task: Fix WRONG iptv-org URL and rebuild API/channels/hook with YouTube support
+
+Work Log:
+- Identified the core bug: API was using WRONG URL `https://raw.githubusercontent.com/iptv-org/iptv/master/streams/id.m3u` (404/empty)
+- Fixed to CORRECT URL: `https://raw.githubusercontent.com/iptv-org/iptv/gh-pages/countries/id.m3u`
+- Added fallback URL: `https://iptv-org.github.io/iptv/countries/id.m3u`
+- Rewrote /src/app/api/channels/route.ts with comprehensive M3U parsing
+- Fixed M3U name extraction bug: http-user-agent attributes contain commas (e.g., "KHTML, like Gecko") that broke the naive /,(.+)$/ regex
+- New parsing strategy: find group-title attribute first, then extract name after it
+- Added tvg-logo extraction from M3U for channel logos (172 channels now have logos)
+- Added YouTube Live stream IDs for Metro TV (AUE5iHINUIw), tvOne (yNKvkPJl-tg), Kompas TV (DOOrIxw5xOw)
+- Added youtubeUrl and logo fields to TVChannel interface
+- Created YouTubeEmbed component in video-player.tsx for reliable YouTube live playback
+- Updated channel cards in page.tsx to show tvg-logo images with fallback to logoText
+- Updated supplementary channels with known-working URLs (IndiHomeTV DASH, HLS, etc.)
+- Added isGeoBlocked flag - 14 geo-blocked channels marked with warning
+- 15-minute in-memory cache for API responses
+- Updated use-auto-update-channels.ts hook with new TVChannel type
+- Lint passes clean, dev server running, API returns 195 channels
+
+Stage Summary:
+- FIXED: iptv-org URL changed from broken /master/streams/ to correct /gh-pages/countries/
+- API now returns 195 channels (up from 183 with wrong URL)
+- 172 channels have logo images from tvg-logo
+- 3 channels have YouTube Live alternatives (Metro TV, tvOne, Kompas TV)
+- 14 geo-blocked channels flagged with isGeoBlocked
+- YouTube embed player for channels with youtubeUrl (more reliable than HLS)
+- Logo images displayed in channel cards, now playing panel, and popular grid
+- Both primary and fallback M3U URLs supported with 10s timeout

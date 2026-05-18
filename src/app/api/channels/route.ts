@@ -30,11 +30,26 @@ interface ParsedChannel {
 
 const IPTV_ORG_URL = 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/id.m3u';
 
+// Supplementary channels NOT in iptv-org but known to work
+const SUPPLEMENTARY_CHANNELS: TVChannelData[] = [
+  { id: "sctv", name: "SCTV", category: "nasional", description: "SCTV - TV swasta nasional", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/sctv/manifest.mpd", logoText: "SC", color: "#dc2626", region: "Nasional" },
+  { id: "indosiar", name: "Indosiar", category: "nasional", description: "Indosiar - TV hiburan dan informasi", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/indosiar/manifest.mpd", logoText: "IS", color: "#f59e0b", region: "Nasional" },
+  { id: "kompastv", name: "Kompas TV", category: "berita", description: "Kompas TV - TV berita terpercaya", streamUrl: "https://wahyu1ptv.pages.dev/KompasTV-HD.m3u8", logoText: "KT", color: "#1d4ed8", region: "Nasional" },
+  { id: "mojitv", name: "Moji", category: "nasional", description: "Moji - TV hiburan dan gaya hidup", streamUrl: "https://wahyu1ptv.pages.dev/Moji-HD.m3u8", logoText: "MJ", color: "#e11d48", region: "Nasional" },
+  { id: "nickelodeon", name: "Nickelodeon", category: "nasional", description: "Nickelodeon Asia - TV anak dan kartun", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/nickelodeon/manifest.mpd", logoText: "NK", color: "#f59e0b", region: "Nasional" },
+  { id: "saliratv", name: "Salira TV", category: "gaya_hidup", description: "Salira TV - TV budaya dan gaya hidup Sunda", streamUrl: "https://live.salira.tv/p/3870/hybrid/play.m3u8", logoText: "SA", color: "#0e7490", region: "Jawa Barat" },
+  { id: "allegro", name: "Allegro", category: "gaya_hidup", description: "Allegro - Channel gaya hidup", streamUrl: "https://vodcdn.bamboo-cloud.com/livehls/68c525e1063044539b09c253/master.m3u8", logoText: "AL", color: "#7c3aed", region: "Nasional", headers: { "http-referrer": "https://allegrotelkomvision.renderforestsites.com/" } },
+  { id: "idxchannel", name: "IDX Channel", category: "bisnis", description: "IDX Channel - TV pasar modal dan investasi", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/idx/manifest.mpd", logoText: "IX", color: "#1d4ed8", region: "Nasional" },
+  { id: "tvrparlemen", name: "TVR Parlemen", category: "bisnis", description: "TVR Parlemen - TV parlemen Indonesia", streamUrl: "https://ssv1.dpr.go.id/golive/livestream/playlist.m3u8", logoText: "VP", color: "#0e7490", region: "Nasional" },
+  { id: "tvrisport", name: "TVRI Sport", category: "olahraga", description: "TVRI Sport - Channel olahraga Indonesia", streamUrl: "https://ott-balancer.tvri.go.id/live/eds/SportHD/hls/SportHD.m3u8", logoText: "TS", color: "#dc2626", region: "Nasional" },
+  { id: "angel_tv", name: "Angel TV", category: "religi", description: "Angel TV Indonesia - TV Kristiani", streamUrl: "https://janya-digimix.akamaized.net/vglive-sk-234616/indonesia/ngrp:angelindonesia_all/playlist.m3u8", logoText: "AG", color: "#7c3aed", region: "Nasional" },
+  { id: "iamchannel", name: "I Am Channel", category: "religi", description: "I Am Channel - TV Kristiani Indonesia", streamUrl: "https://61146e7ab7a66.streamlock.net:8089/tes/1/chunklist.m3u8", logoText: "IA", color: "#0369a1", region: "Nasional", headers: { "http-referrer": "https://iamchannel.org/" } },
+];
+
 // ---- Parsing ----
 function parseM3U(m3uText: string): ParsedChannel[] {
   const lines = m3uText.split('\n');
-  const channels: ParsedChannel[] = [];
-  const seen = new Map<string, ParsedChannel>(); // normalized name -> channel, prefer higher quality
+  const seen = new Map<string, ParsedChannel>();
 
   let i = 0;
   while (i < lines.length) {
@@ -49,19 +64,18 @@ function parseM3U(m3uText: string): ParsedChannel[] {
     const nameMatch = line.match(/,(.+)$/);
     const rawName = nameMatch?.[1]?.trim() || '';
 
-    // Clean name
     const cleanName = rawName
       .replace(/\s*\(\d{3,4}[ip]\)\s*/g, '')
       .replace(/\s*\(\d{3,4}i\)\s*/g, '')
       .replace(/\s*\[Not 24\/7\]\s*/g, '')
       .replace(/\s*\(Am Media\)\s*/g, '')
+      .replace(/\s*\[Geo-blocked\]\s*/g, '')
       .trim();
 
     const qualityMatch = rawName.match(/\((\d{3,4}[ip])\)/);
     const quality = qualityMatch?.[1] || '';
     const isNot247 = rawName.includes('[Not 24/7]');
 
-    // Collect EXTVLCOPT headers
     const headers: Record<string, string> = {};
     let j = i + 1;
     while (j < lines.length && lines[j].trim().startsWith('#EXTVLCOPT:')) {
@@ -76,7 +90,6 @@ function parseM3U(m3uText: string): ParsedChannel[] {
       j++;
     }
 
-    // Find URL line
     let streamUrl = '';
     while (j < lines.length) {
       const urlLine = lines[j].trim();
@@ -91,12 +104,10 @@ function parseM3U(m3uText: string): ParsedChannel[] {
     if (streamUrl && cleanName) {
       const normalizedName = cleanName.toLowerCase().replace(/[\s\-_.]/g, '');
       
-      // Prefer higher quality or same quality with headers
       const existing = seen.get(normalizedName);
       const qualityScore = getQualityScore(quality);
       const existingScore = existing ? getQualityScore(existing.quality) : 0;
       
-      // Prefer: 1) higher quality, 2) not marked as not-24/7, 3) with headers for referrer
       if (!existing || qualityScore > existingScore || 
           (qualityScore === existingScore && !isNot247 && existing.isNot247) ||
           (qualityScore === existingScore && Object.keys(headers).length > 0 && !existing.headers)) {
@@ -128,17 +139,14 @@ function guessCategory(name: string, tvgId: string): string {
   const n = name.toLowerCase();
   const id = tvgId.toLowerCase();
 
-  // TVRI (must check first)
   if (id.includes('tvri') || (n.includes('tvri') && !n.includes('sport'))) return 'tvri';
-  if (id.includes('TVRISport') || (n.includes('tvri') && n.includes('sport'))) return 'olahraga';
+  if (n.includes('tvri') && n.includes('sport')) return 'olahraga';
 
-  // National channels (check BEFORE regional - these are major national stations)
   const nationalKeywords = ['rcti', 'sctv', 'indosiar', 'trans7', 'trans tv', 'gtv', 'mnc', 'mdtv', 'garuda', 'daai',
     'nusantara tv', 'moji', 'antv', 'rajawali tv', 'nickelodeon', 'my kidz'];
   for (const kw of nationalKeywords) {
     if (n.includes(kw)) return 'nasional';
   }
-  // Also check tvgId for national channels
   const nationalTvgIds = ['RCTI.id', 'SCTV.id', 'Indosiar.id', 'Trans7.id', 'TransTV.id', 'GTV.id', 'MNCTV.id',
     'MDTV.id', 'GarudaTV.id', 'DAAITV.id', 'NusantaraTV.id', 'ANTV.id', 'RajawaliTV.id',
     'Nickelodeon.id', 'MyKidz.id'];
@@ -146,31 +154,15 @@ function guessCategory(name: string, tvgId: string): string {
     if (tvgId.includes(kw)) return 'nasional';
   }
 
-  // Sports
   if (n.includes('sport') || n.includes('spotv') || id.toLowerCase().includes('spotv')) return 'olahraga';
-
-  // Kids
   if (n.includes('kids') || n.includes('kidz') || n.includes('ananda')) return 'anak';
-
-  // Music
   if (n.includes('music') || n.includes('musik') || n.includes('madu') || n.includes('izzah') || n.includes('lingkar')) return 'musik';
-
-  // Religion
   if (n.includes('dakwah') || n.includes('islam') || n.includes('al-') || n.includes('rodja') || n.includes('mqtv') || n.includes('mta') || n.includes('dhamma') || n.includes('angel') || n.includes('wesal') || n.includes('salam') || n.includes('nabawi') || n.includes('madani') || n.includes('ashiil') || n.includes('mui') || n.includes('surau')) return 'religi';
-
-  // News
   if (n.includes('berita') || n.includes('news') || n.includes('cnbc') || n.includes('kompas') || n.includes('metro') || n.includes('sindo') || n.includes('magna') || n.includes('btv') || n.includes('jakarta globe') || n.includes('beritasatu') || n.includes('sinpo') || n.includes('radar') || n.includes('one') || n.includes('idtv')) return 'berita';
-
-  // Business
   if (n.includes('biznet') || n.includes('idx') || n.includes('parlemen') || n.includes('mbg')) return 'bisnis';
-
-  // Lifestyle
   if (n.includes('lifestyle') || n.includes('gaya') || n.includes('salira') || n.includes('allegro')) return 'gaya_hidup';
-
-  // Entertainment
   if (n.includes('ficom') || n.includes('indonesiana') || n.includes('elshinta') || n.includes('u channel') || n.includes('utv') || id.includes('UChannel')) return 'hiburan';
 
-  // Regional patterns (check AFTER all other categories)
   const regionKeywords = ['bandung', 'jogja', 'yogya', 'semarang', 'surabaya', 'bali', 'banjar', 'batam', 'banten',
     'pontianak', 'samarinda', 'padang', 'riau', 'makassar', 'manado', 'kawanua', 'jambi', 'balikpapan',
     'banyumas', 'caruban', 'dhoho', 'duta', 'jtv', 'jek', 'matrix', 'kilisuci', 'astro blitar',
@@ -186,9 +178,7 @@ function guessCategory(name: string, tvgId: string): string {
     if (n.includes(kw)) return 'daerah';
   }
 
-  // Default for known TV channels
   if (id.includes('.id@')) return 'daerah';
-
   return 'daerah';
 }
 
@@ -228,7 +218,7 @@ function guessRegion(name: string, tvgId: string): string {
     'Sulawesi Tenggara': ['sulawesi tenggara', 'sultra', 'southeast sulawesi'],
     'Maluku': ['maluku', 'ambon'],
     'Papua': ['papua'],
-    'Papua Barat': ['papua barat', 'west papua', 'west papua'],
+    'Papua Barat': ['papua barat', 'west papua'],
   };
 
   for (const [region, keywords] of Object.entries(regionMap)) {
@@ -237,7 +227,6 @@ function guessRegion(name: string, tvgId: string): string {
     }
   }
 
-  // TVRI regions from tvgId
   if (id.includes('tvri')) {
     const tvgIdRegionMap: Record<string, string> = {
       'Aceh': 'Aceh', 'Sumut': 'Sumatera Utara', 'Sumbar': 'Sumatera Barat',
@@ -300,7 +289,6 @@ function generateDescription(name: string, category: string, region: string, qua
 }
 
 function generateId(name: string, tvgId: string): string {
-  // Use tvgId-based ID if available for stable identification
   if (tvgId) {
     return tvgId.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
   }
@@ -311,12 +299,23 @@ function generateId(name: string, tvgId: string): string {
 function buildChannels(parsed: ParsedChannel[]): TVChannelData[] {
   const seenIds = new Map<string, TVChannelData>();
 
+  // Add supplementary channels first (they take priority for matching names)
+  for (const ch of SUPPLEMENTARY_CHANNELS) {
+    seenIds.set(ch.id, ch);
+  }
+
   for (const ch of parsed) {
     const id = generateId(ch.name, ch.tvgId);
     const category = guessCategory(ch.name, ch.tvgId);
     const region = guessRegion(ch.name, ch.tvgId);
     
-    // If same ID already exists, prefer the one with better quality
+    // Skip if supplementary channel with same base name exists
+    const baseName = ch.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const isSupplemented = SUPPLEMENTARY_CHANNELS.some(sup => 
+      sup.name.toLowerCase().replace(/[^a-z0-9]/g, '') === baseName
+    );
+    if (isSupplemented) continue;
+    
     const existing = seenIds.get(id);
     const newQualityScore = getQualityScore(ch.quality);
     const existingQualityScore = existing ? getQualityScore(existing.quality || '') : 0;
@@ -339,7 +338,6 @@ function buildChannels(parsed: ParsedChannel[]): TVChannelData[] {
   }
 
   return Array.from(seenIds.values()).sort((a, b) => {
-    // Sort: nasional first, then by category, then by name
     const catOrder: Record<string, number> = {
       'nasional': 0, 'berita': 1, 'hiburan': 2, 'olahraga': 3,
       'anak': 4, 'musik': 5, 'religi': 6, 'daerah': 7, 'tvri': 8,
@@ -352,14 +350,13 @@ function buildChannels(parsed: ParsedChannel[]): TVChannelData[] {
 }
 
 export async function GET() {
-  // Return cached data if still fresh
   if (cachedData && Date.now() - cacheTime < CACHE_DURATION) {
     return NextResponse.json(cachedData);
   }
 
   try {
     const response = await fetch(IPTV_ORG_URL, {
-      next: { revalidate: 900 }, // 15 min cache for Next.js
+      next: { revalidate: 900 },
     });
 
     if (!response.ok) {
@@ -380,13 +377,14 @@ export async function GET() {
 
     return NextResponse.json(cachedData);
   } catch (error) {
-    // Return stale cache if available, otherwise error
     if (cachedData) {
       return NextResponse.json(cachedData);
     }
-    return NextResponse.json(
-      { error: 'Failed to fetch channel data', channels: [], updatedAt: new Date().toISOString(), totalFromSource: 0 },
-      { status: 500 }
-    );
+    // Fallback: return supplementary channels
+    return NextResponse.json({
+      channels: SUPPLEMENTARY_CHANNELS,
+      updatedAt: new Date().toISOString(),
+      totalFromSource: SUPPLEMENTARY_CHANNELS.length,
+    });
   }
 }

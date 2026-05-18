@@ -53,3 +53,23 @@ Stage Summary:
 - YouTube embed player for channels with youtubeUrl (more reliable than HLS)
 - Logo images displayed in channel cards, now playing panel, and popular grid
 - Both primary and fallback M3U URLs supported with 10s timeout
+---
+Task ID: 1
+Agent: main
+Task: Fix channels not displaying - adopt Google TV approach with YouTube Live + iptv-org dynamic loading
+
+Work Log:
+- Fixed critical bug: API route was using WRONG iptv-org URL (master/streams/id.m3u → gh-pages/countries/id.m3u)
+- Added YouTube Live stream support for Metro TV, tvOne, Kompas TV, CNN Indonesia
+- Created hybrid video player with YouTube iframe embed + native HLS/DASH fallback
+- Added tvg-logo extraction from M3U for 168/196 channel logos
+- Added isGeoBlocked flag for 10 geo-blocked channels
+- Added image remote patterns in next.config.ts for logo images
+- Updated static fallback channels with known-working URLs
+- Pushed to GitHub and deployed to Vercel
+
+Stage Summary:
+- 196 channels now loading dynamically from iptv-org (was 0 before)
+- 4 YouTube Live channels (Metro TV, tvOne, Kompas TV, CNN Indonesia)
+- 168 channels have logo images
+- Production URL: https://tvherman.vercel.app - API returning 200 with all channels

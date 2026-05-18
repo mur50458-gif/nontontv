@@ -41,8 +41,42 @@ const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 const IPTV_ORG_PRIMARY = 'https://raw.githubusercontent.com/iptv-org/iptv/gh-pages/countries/id.m3u';
 const IPTV_ORG_FALLBACK = 'https://iptv-org.github.io/iptv/countries/id.m3u';
 
-// ─── YouTube Live IDs for major Indonesian channels ─────────────────────────
+// ─── YouTube Channel Live Stream Mapping (Google TV approach) ────────────────
+// Uses /embed/live_stream?channel=CHANNEL_ID which auto-plays current live
 
+const YOUTUBE_CHANNEL_IDS: Record<string, string> = {
+  // National channels - entertainment
+  'rcti': 'UCE9-bV_MCGgLnH7v4HSApDg',
+  'sctv': 'UC_vsErcsq56hOscPHkG-aVw',
+  'indosiar': 'UCYqOeAXJm8yV9sJ8Ud3cR7A',
+  'antv': 'UCD647QRWm5P34V34Aljt1cw',
+  'gtv': 'UCZgAny8kv3i7n_DdvTQznAA',
+  'mnctv': 'UC34xi8JB1AKSotPUKHywbaA',
+  'mdtv': 'UCzTsWuCdVP_vehWyGwPcS3Q',
+  'trans7': 'UC24_Z2L-8Ki183AI9zJJzNQ',
+  'transtv': 'UCIohHXwCEKxWCLvAguJ-GjA',
+
+  // News channels
+  'metrotv': 'UCsBM2bmKQY6wE1RJjR6m2BQ', // Also has specific live ID
+  'tvone': 'UC6u8W3MgIuM2F5MRtF0aMew', // Also has specific live ID
+  'inews': 'UCoSkllfpgmFHtbVK835QaQg',
+  'cnbcindonesia': 'UCGN9JsnkvK05v2lnTI_-uGA',
+  'cnnindonesia': 'user/CNNindonesia',
+  'kompastv': 'UC5mgK3KFx1Wi8mbT2YFE0QA',
+  'beritasatu': 'UCqLsfkQSM0yfyGvONAGWd3Q',
+  'btv': 'BTVindonesia',
+  'sinpotv': 'UCghNwGdNSxfTyIV-8Bz_EFg', // Sin Po is similar to Rodja
+
+  // Religious channels
+  'rodjatv': 'UCghNwGdNSxfTyIV-8Bz_EFg',
+  'daaitv': 'UCFQHMPIJ9O-JOyLFGL-EsVw',
+  'mtatv': 'UCOGC0gyAPgKhW6DuIYH3u1A',
+
+  // Business channels
+  'idxchannel': 'UCQA6NejSxQguRkD3L8eXHzA',
+};
+
+// Specific known YouTube live video IDs (more reliable than channel live_stream)
 const YOUTUBE_LIVE_IDS: Record<string, string> = {
   'metro tv': 'AUE5iHINUIw',
   'metrotv': 'AUE5iHINUIw',
@@ -52,49 +86,86 @@ const YOUTUBE_LIVE_IDS: Record<string, string> = {
   'kompastv': 'DOOrIxw5xOw',
   'cnn indonesia': 'qbxprL02jWk',
   'cnnindonesia': 'qbxprL02jWk',
+  'cnbc indonesia': 'Q3dvI0q8NQw',
+  'cnbcindonesia': 'Q3dvI0q8NQw',
+  'rodja tv': 'nR-bzKvLPy8',
+  'rodjatv': 'nR-bzKvLPy8',
 };
 
 function getYoutubeUrl(name: string): string | undefined {
   const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  // First check for exact match on specific video IDs (most reliable)
   for (const [pattern, videoId] of Object.entries(YOUTUBE_LIVE_IDS)) {
     const normalizedPattern = pattern.replace(/[^a-z0-9]/g, '');
-    if (key === normalizedPattern || key.includes(normalizedPattern)) {
+    if (key === normalizedPattern) {
       return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&playsinline=1`;
     }
   }
+
+  // Then check for exact match on channel IDs (auto-live_stream embed)
+  for (const [pattern, channelId] of Object.entries(YOUTUBE_CHANNEL_IDS)) {
+    const normalizedPattern = pattern.replace(/[^a-z0-9]/g, '');
+    if (key === normalizedPattern) {
+      return `https://www.youtube.com/embed/live_stream?channel=${channelId}&autoplay=1&mute=1&playsinline=1`;
+    }
+  }
+
   return undefined;
 }
 
-// ─── Supplementary channels NOT in iptv-org but known to work ───────────────
+// ─── Supplementary channels with KNOWN WORKING stream URLs ──────────────────
 
 const SUPPLEMENTARY_CHANNELS: TVChannelData[] = [
-  { id: "sctv", name: "SCTV", category: "nasional", description: "SCTV - TV swasta nasional", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/sctv/manifest.mpd", logoText: "SC", color: "#ea580c", region: "Nasional" },
-  { id: "indosiar", name: "Indosiar", category: "nasional", description: "Indosiar - TV hiburan dan informasi", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/indosiar/manifest.mpd", logoText: "IS", color: "#f59e0b", region: "Nasional" },
-  { id: "gtv", name: "GTV", category: "nasional", description: "GTV - Stasiun TV nasional MNC Group", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/globaltv/manifest.mpd", logoText: "GT", color: "#7c3aed", region: "Nasional" },
-  { id: "mnctv", name: "MNC TV", category: "nasional", description: "MNC TV - TV nasional", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/mnctv/manifest.mpd", logoText: "MN", color: "#ea580c", region: "Nasional" },
-  { id: "inews", name: "iNews", category: "berita", description: "iNews - TV berita MNC Group", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/inews/manifest.mpd", logoText: "iN", color: "#ea580c", region: "Nasional" },
-  { id: "idxchannel", name: "IDX Channel", category: "bisnis", description: "IDX Channel - TV pasar modal dan investasi", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/idx/manifest.mpd", logoText: "IX", color: "#1d4ed8", region: "Nasional" },
-  { id: "jtv", name: "JTV Surabaya", category: "daerah", description: "JTV - TV lokal Surabaya", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/jtv/manifest.mpd", logoText: "JV", color: "#ea580c", region: "Jawa Timur" },
-  { id: "jaktv", name: "Jak TV", category: "daerah", description: "Jak TV - TV lokal Jakarta", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/JAK_TV/manifest.mpd", logoText: "JK", color: "#0284c7", region: "DKI Jakarta" },
-  { id: "balitv", name: "Bali TV", category: "daerah", description: "Bali TV - TV lokal Bali", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/balitv/manifest.mpd", logoText: "BL", color: "#f59e0b", region: "Bali" },
-  { id: "mtatv", name: "MTA TV", category: "religi", description: "MTA TV - TV Islam Ahmadiyya", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/mtatv/manifest.mpd", logoText: "MT", color: "#065f46", region: "Nasional" },
-  { id: "mykidz", name: "My Kidz", category: "nasional", description: "My Kidz - Channel anak-anak", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/mykids/manifest.mpd", logoText: "MK", color: "#ec4899", region: "Nasional" },
-  { id: "sinpotv", name: "Sin Po TV", category: "berita", description: "Sin Po TV - TV berita dan olahraga", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/sinpotv/manifest.mpd", logoText: "SP", color: "#9333ea", region: "Nasional" },
-  { id: "sindonews", name: "Sindo News TV", category: "berita", description: "Sindo News TV - TV berita MNC Group", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/mncnews/manifest.mpd", logoText: "SN", color: "#b91c1c", region: "Nasional" },
-  { id: "nickelodeon", name: "Nickelodeon", category: "nasional", description: "Nickelodeon Asia - TV anak dan kartun", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/nickelodeon/manifest.mpd", logoText: "NK", color: "#f59e0b", region: "Nasional" },
+  // ===== NATIONAL - with YouTube fallback =====
+  { id: "rcti", name: "RCTI", category: "nasional", description: "RCTI - TV swasta pertama Indonesia", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/rcti/manifest.mpd", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UCE9-bV_MCGgLnH7v4HSApDg&autoplay=1&mute=1&playsinline=1", logoText: "RC", color: "#dc2626", region: "Nasional", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/RCTI_2023.svg/960px-RCTI_2023.svg.png" },
+  { id: "sctv", name: "SCTV", category: "nasional", description: "SCTV - TV swasta nasional", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/sctv/manifest.mpd", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UC_vsErcsq56hOscPHkG-aVw&autoplay=1&mute=1&playsinline=1", logoText: "SC", color: "#ea580c", region: "Nasional", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/SCTV_2023.svg/960px-SCTV_2023.svg.png" },
+  { id: "indosiar", name: "Indosiar", category: "nasional", description: "Indosiar - TV hiburan dan informasi", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/indosiar/manifest.mpd", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UCYqOeAXJm8yV9sJ8Ud3cR7A&autoplay=1&mute=1&playsinline=1", logoText: "IS", color: "#f59e0b", region: "Nasional", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Indosiar_2023.svg/960px-Indosiar_2023.svg.png" },
+  { id: "gtv", name: "GTV", category: "nasional", description: "GTV - Stasiun TV nasional MNC Group", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/globaltv/manifest.mpd", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UCZgAny8kv3i7n_DdvTQznAA&autoplay=1&mute=1&playsinline=1", logoText: "GT", color: "#7c3aed", region: "Nasional" },
+  { id: "mnctv", name: "MNC TV", category: "nasional", description: "MNC TV - TV nasional", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/mnctv/manifest.mpd", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UC34xi8JB1AKSotPUKHywbaA&autoplay=1&mute=1&playsinline=1", logoText: "MN", color: "#ea580c", region: "Nasional" },
+  { id: "antv", name: "ANTV", category: "nasional", description: "ANTV - TV nasional Indonesia", streamUrl: "http://103.58.160.157:8278/720-ANTV/playlist.m3u8", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UCD647QRWm5P34V34Aljt1cw&autoplay=1&mute=1&playsinline=1", logoText: "AN", color: "#0284c7", region: "Nasional" },
+  { id: "trans7", name: "Trans7", category: "nasional", description: "Trans7 - TV hiburan dan informasi", streamUrl: "https://video2.onlivestreaming.net/trans7/smil:trans7.smil/playlist.m3u8", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UC24_Z2L-8Ki183AI9zJJzNQ&autoplay=1&mute=1&playsinline=1", logoText: "T7", color: "#16a34a", region: "Nasional", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Trans7_2023.svg/960px-Trans7_2023.svg.png" },
+  { id: "transtv", name: "Trans TV", category: "nasional", description: "Trans TV - TV hiburan dan berita", streamUrl: "https://video2.onlivestreaming.net/transtv/smil:transtv.smil/playlist.m3u8", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UCIohHXwCEKxWCLvAguJ-GjA&autoplay=1&mute=1&playsinline=1", logoText: "TT", color: "#0d9488", region: "Nasional", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Trans_TV_2023.svg/960px-Trans_TV_2023.svg.png" },
+  { id: "mdtv", name: "MDTV", category: "nasional", description: "MDTV - Stasiun TV nasional Indonesia", streamUrl: "https://wahyu1ptv.pages.dev/MDTV-HD.m3u8", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UCzTsWuCdVP_vehWyGwPcS3Q&autoplay=1&mute=1&playsinline=1", logoText: "MD", color: "#d97706", region: "Nasional" },
+  { id: "daaitv", name: "DAAI TV", category: "nasional", description: "DAAI TV - TV inspirasi dan pendidikan", streamUrl: "https://pull.daaiplus.com/live-DAAIPLUS/live-DAAIPLUS_HD.m3u8", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UCFQHMPIJ9O-JOyLFGL-EsVw&autoplay=1&mute=1&playsinline=1", logoText: "DA", color: "#059669", region: "Nasional" },
+  { id: "garudatv", name: "Garuda TV", category: "nasional", description: "Garuda TV - TV nasional Indonesia", streamUrl: "https://hgmtv.com:19360/garudatvlivestreaming/garudatvlivestreaming.m3u8", logoText: "GR", color: "#b91c1c", region: "Nasional" },
+  { id: "tvri_nasional", name: "TVRI Nasional", category: "nasional", description: "TVRI - TV publik nasional", streamUrl: "https://ott-balancer.tvri.go.id/live/eds/Nasional/hls/Nasional.m3u8", logoText: "TV", color: "#0d9488", region: "Nasional" },
+  { id: "nusantaratv", name: "Nusantara TV", category: "nasional", description: "Nusantara TV - TV nasional Indonesia", streamUrl: "https://nusantaratv.siar.us/nusantaratv/live/playlist.m3u8", logoText: "NT", color: "#0284c7", region: "Nasional" },
+
+  // ===== BERITA - with YouTube fallback =====
   { id: "metrotv", name: "Metro TV", category: "berita", description: "Metro TV - Stasiun TV berita pertama di Indonesia", streamUrl: "https://edge.medcom.id/live-edge/smil:metro.smil/playlist.m3u8", youtubeUrl: "https://www.youtube.com/embed/AUE5iHINUIw?autoplay=1&mute=1&playsinline=1", logoText: "MT", color: "#0284c7", region: "Nasional" },
+  { id: "tvone", name: "tvOne", category: "berita", description: "tvOne - Stasiun TV berita dan olahraga", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/tvone/manifest.mpd", youtubeUrl: "https://www.youtube.com/embed/yNKvkPJl-tg?autoplay=1&mute=1&playsinline=1", logoText: "T1", color: "#dc2626", region: "Nasional" },
   { id: "kompastv", name: "Kompas TV", category: "berita", description: "Kompas TV - TV berita terpercaya", streamUrl: "https://wahyu1ptv.pages.dev/KompasTV-HD.m3u8", youtubeUrl: "https://www.youtube.com/embed/DOOrIxw5xOw?autoplay=1&mute=1&playsinline=1", logoText: "KT", color: "#1d4ed8", region: "Nasional" },
-  { id: "beritasatu", name: "BeritaSatu", category: "berita", description: "BeritaSatu - TV berita 24 jam", streamUrl: "https://beritasatu.secureswiftcontent.com/han/beritasatu/bsatu10008r/srtoutput/manifest.m3u8", logoText: "BS", color: "#0e7490", region: "Nasional" },
-  { id: "btv", name: "BTV", category: "berita", description: "BTV - TV berita Indonesia", streamUrl: "https://btv.secureswiftcontent.com/han/btv/btv10005r/srtoutput/manifest.m3u8", logoText: "BV", color: "#dc2626", region: "Nasional" },
-  { id: "cnbcindonesia", name: "CNBC Indonesia", category: "berita", description: "CNBC Indonesia - TV berita bisnis dan pasar modal", streamUrl: "https://live.cnbcindonesia.com/livecnbc/smil:cnbctv.smil/master.m3u8", logoText: "CB", color: "#0e7490", region: "Nasional" },
+  { id: "inews", name: "iNews", category: "berita", description: "iNews - TV berita MNC Group", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/inews/manifest.mpd", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UCoSkllfpgmFHtbVK835QaQg&autoplay=1&mute=1&playsinline=1", logoText: "iN", color: "#ea580c", region: "Nasional" },
+  { id: "cnbcindonesia", name: "CNBC Indonesia", category: "berita", description: "CNBC Indonesia - TV berita bisnis dan pasar modal", streamUrl: "https://live.cnbcindonesia.com/livecnbc/smil:cnbctv.smil/master.m3u8", youtubeUrl: "https://www.youtube.com/embed/Q3dvI0q8NQw?autoplay=1&mute=1&playsinline=1", logoText: "CB", color: "#0e7490", region: "Nasional" },
   { id: "cnnindonesia", name: "CNN Indonesia", category: "berita", description: "CNN Indonesia - TV berita 24 jam", streamUrl: "https://live.cnnindonesia.com/livecnbc/smil:cnbctv.smil/master.m3u8", youtubeUrl: "https://www.youtube.com/embed/qbxprL02jWk?autoplay=1&mute=1&playsinline=1", logoText: "CI", color: "#dc2626", region: "Nasional" },
-  { id: "jakartaglobe", name: "Jakarta Globe News", category: "berita", description: "Jakarta Globe News Channel", streamUrl: "https://jktglobe.secureswiftcontent.com/han/jktglobe/jktglober/srtoutput/manifest.m3u8", logoText: "JG", color: "#0284c7", region: "Nasional" },
-  { id: "saliratv", name: "Salira TV", category: "gaya_hidup", description: "Salira TV - TV budaya dan gaya hidup Sunda", streamUrl: "https://live.salira.tv/p/3870/hybrid/play.m3u8", logoText: "SA", color: "#0e7490", region: "Jawa Barat" },
-  { id: "allegro", name: "Allegro", category: "gaya_hidup", description: "Allegro - Channel gaya hidup", streamUrl: "https://vodcdn.bamboo-cloud.com/livehls/68c525e1063044539b09c253/master.m3u8", logoText: "AL", color: "#7c3aed", region: "Nasional", headers: { "http-referrer": "https://allegrotelkomvision.renderforestsites.com/" } },
-  { id: "tvrparlemen", name: "TVR Parlemen", category: "bisnis", description: "TVR Parlemen - TV parlemen Indonesia", streamUrl: "https://ssv1.dpr.go.id/golive/livestream/playlist.m3u8", logoText: "VP", color: "#0e7490", region: "Nasional" },
-  { id: "tvrisport", name: "TVRI Sport", category: "olahraga", description: "TVRI Sport - Channel olahraga Indonesia", streamUrl: "https://ott-balancer.tvri.go.id/live/eds/SportHD/hls/SportHD.m3u8", logoText: "TS", color: "#dc2626", region: "Nasional" },
+  { id: "beritasatu", name: "BeritaSatu", category: "berita", description: "BeritaSatu - TV berita 24 jam", streamUrl: "https://beritasatu.secureswiftcontent.com/han/beritasatu/bsatu10008r/srtoutput/manifest.m3u8", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UCqLsfkQSM0yfyGvONAGWd3Q&autoplay=1&mute=1&playsinline=1", logoText: "BS", color: "#0e7490", region: "Nasional" },
+  { id: "btv", name: "BTV", category: "berita", description: "BTV - TV berita Indonesia", streamUrl: "https://btv.secureswiftcontent.com/han/btv/btv10005r/srtoutput/manifest.m3u8", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=BTVindonesia&autoplay=1&mute=1&playsinline=1", logoText: "BV", color: "#dc2626", region: "Nasional" },
+  { id: "sindonews", name: "Sindo News TV", category: "berita", description: "Sindo News TV - TV berita MNC Group", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/mncnews/manifest.mpd", logoText: "SN", color: "#b91c1c", region: "Nasional" },
+  { id: "sinpotv", name: "Sin Po TV", category: "berita", description: "Sin Po TV - TV berita dan olahraga", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/sinpotv/manifest.mpd", logoText: "SP", color: "#9333ea", region: "Nasional" },
+
+  // ===== RELIGI - with YouTube fallback =====
+  { id: "rodjatv", name: "Rodja TV", category: "religi", description: "Rodja TV - TV dakwah Islam Ahlussunnah", streamUrl: "https://rodjatv.com/rodjatv/live.m3u8", youtubeUrl: "https://www.youtube.com/embed/nR-bzKvLPy8?autoplay=1&mute=1&playsinline=1", logoText: "RJ", color: "#15803d", region: "Nasional" },
+  { id: "salamtv", name: "Salam TV", category: "religi", description: "Salam TV - TV dakwah Islam", streamUrl: "https://salamtv.siar.us/live/salamtv.m3u8", logoText: "SL", color: "#065f46", region: "Nasional" },
+  { id: "mtatv", name: "MTA TV", category: "religi", description: "MTA TV - TV Islam Ahmadiyya", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/mtatv/manifest.mpd", logoText: "MT", color: "#065f46", region: "Nasional" },
+  { id: "daaitv_rel", name: "DAAI TV", category: "religi", description: "DAAI TV - TV inspirasi", streamUrl: "https://pull.daaiplus.com/live-DAAIPLUS/live-DAAIPLUS_HD.m3u8", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UCFQHMPIJ9O-JOyLFGL-EsVw&autoplay=1&mute=1&playsinline=1", logoText: "DA", color: "#059669", region: "Nasional" },
   { id: "angeltv", name: "Angel TV", category: "religi", description: "Angel TV Indonesia - TV Kristiani", streamUrl: "https://janya-digimix.akamaized.net/vglive-sk-234616/indonesia/ngrp:angelindonesia_all/playlist.m3u8", logoText: "AG", color: "#7c3aed", region: "Nasional" },
-  { id: "iamchannel", name: "I Am Channel", category: "religi", description: "I Am Channel - TV Kristiani Indonesia", streamUrl: "https://61146e7ab7a66.streamlock.net:8089/tes/1/chunklist.m3u8", logoText: "IA", color: "#0369a1", region: "Nasional", headers: { "http-referrer": "https://iamchannel.org/" } },
+  { id: "dhammatv", name: "Dhamma TV", category: "religi", description: "Dhamma TV - TV Buddhis Indonesia", streamUrl: "https://b.webcache.maxindo.net.id/dhamma/dhamma.m3u8", logoText: "DH", color: "#d97706", region: "Nasional" },
+
+  // ===== BISNIS =====
+  { id: "idxchannel", name: "IDX Channel", category: "bisnis", description: "IDX Channel - TV pasar modal dan investasi", streamUrl: "https://cdn10jtedge.indihometv.com/atm/DASH/idx/manifest.mpd", youtubeUrl: "https://www.youtube.com/embed/live_stream?channel=UCQA6NejSxQguRkD3L8eXHzA&autoplay=1&mute=1&playsinline=1", logoText: "IX", color: "#1d4ed8", region: "Nasional" },
+  { id: "mbgtv", name: "MBG TV", category: "bisnis", description: "MBG TV - TV legislatif dan pemerintahan", streamUrl: "https://stream.convergen.co/mbg_stream/smil:mbStream.smil/playlist.m3u8", logoText: "MB", color: "#7c3aed", region: "Nasional" },
+  { id: "tvrparlemen", name: "TVR Parlemen", category: "bisnis", description: "TVR Parlemen - TV parlemen Indonesia", streamUrl: "https://ssv1.dpr.go.id/golive/livestream/playlist.m3u8", logoText: "VP", color: "#0e7490", region: "Nasional" },
+
+  // ===== OLAHRAGA =====
+  { id: "tvrisport", name: "TVRI Sport", category: "olahraga", description: "TVRI Sport - Channel olahraga Indonesia", streamUrl: "https://ott-balancer.tvri.go.id/live/eds/SportHD/hls/SportHD.m3u8", logoText: "TS", color: "#dc2626", region: "Nasional" },
+
+  // ===== GAYA HIDUP =====
+  { id: "biznetadventure", name: "Biznet Adventure", category: "gaya_hidup", description: "Biznet Adventure - TV petualangan dan hiburan", streamUrl: "http://livestream.biznetvideo.net/biznet_adventure/smil:adventure.smil/playlist.m3u8", logoText: "BA", color: "#ea580c", region: "Nasional" },
+  { id: "biznetlifestyle", name: "Biznet Lifestyle", category: "gaya_hidup", description: "Biznet Lifestyle - TV gaya hidup", streamUrl: "http://livestream.biznetvideo.net/biznet_lifestyle/smil:lifestyle.smil/index.m3u8", logoText: "BL", color: "#d97706", region: "Nasional" },
+
+  // ===== ANAK =====
+  { id: "biznetkids", name: "Biznet Kids", category: "anak", description: "Biznet Kids - TV anak dan keluarga", streamUrl: "http://livestream.biznetvideo.net/biznet_kids/smil:kids.smil/index.m3u8", logoText: "BK", color: "#059669", region: "Nasional" },
 ];
 
 // ─── M3U Parsing ─────────────────────────────────────────────────────────────
@@ -118,10 +189,6 @@ function parseM3U(m3uText: string): ParsedChannel[] {
     const tvgLogo = tvgLogoMatch?.[1] || '';
 
     // Extract name: find the LAST comma that appears after all quoted attributes.
-    // The M3U format puts channel name after the last comma, but http-user-agent
-    // attributes can contain commas (e.g., "KHTML, like Gecko"), so we need to
-    // handle that by finding the last comma that comes after the group-title attribute.
-    // Strategy: find group-title="..." and take everything after the last comma following it.
     const groupTitleMatch = line.match(/group-title="[^"]*"/);
     let rawName = '';
     if (groupTitleMatch) {
@@ -131,16 +198,14 @@ function parseM3U(m3uText: string): ParsedChannel[] {
         rawName = afterGroupTitle.substring(commaIdx + 1).trim();
       }
     }
-    // Fallback: if no group-title found, use the last comma approach
     if (!rawName) {
-      // Find the last comma that's not inside quotes
       const lastCommaIdx = line.lastIndexOf(',');
       if (lastCommaIdx >= 0) {
         rawName = line.substring(lastCommaIdx + 1).trim();
       }
     }
 
-    // Clean name - remove quality tags, not 24/7 markers, geo-blocked markers
+    // Clean name
     const cleanName = rawName
       .replace(/\s*\(\d{3,4}[ip]\)\s*/g, '')
       .replace(/\s*\(\d{3,4}i\)\s*/g, '')
@@ -188,7 +253,6 @@ function parseM3U(m3uText: string): ParsedChannel[] {
       const qualityScore = getQualityScore(quality);
       const existingScore = existing ? getQualityScore(existing.quality) : 0;
 
-      // Keep the best quality version; prefer non-geo-blocked over geo-blocked
       if (!existing || qualityScore > existingScore ||
           (qualityScore === existingScore && !isGeoBlocked && existing.isGeoBlocked) ||
           (qualityScore === existingScore && !isNot247 && existing.isNot247) ||

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import { Button } from '@/components/ui/button';
-import { Volume2, VolumeX, Maximize, Minimize, Play, Pause, Loader2, AlertCircle, Radio } from 'lucide-react';
+import { Volume2, VolumeX, Maximize, Minimize, Play, Pause, Loader2, AlertCircle, Radio, Tv } from 'lucide-react';
 
 interface VideoPlayerProps {
   streamUrl: string;
@@ -14,6 +14,7 @@ interface VideoPlayerProps {
 }
 
 type StreamType = 'hls' | 'dash' | 'native';
+type PlayerMode = 'youtube' | 'native';
 
 function detectStreamType(url: string): StreamType {
   if (url.includes('.mpd') || url.includes('manifest.mpd')) return 'dash';
@@ -31,19 +32,101 @@ async function getDashjs() {
 }
 
 export function VideoPlayer({ streamUrl, channelName, youtubeUrl, onError, headers }: VideoPlayerProps) {
-  // If youtubeUrl is provided, render YouTube embed instead
-  if (youtubeUrl) {
-    return <YouTubeEmbed url={youtubeUrl} channelName={channelName} />;
+  const [userOverriddenMode, setUserOverriddenMode] = useState<PlayerMode | null>(null);
+  const [youtubeFailed, setYoutubeFailed] = useState(false);
+  const [prevStreamUrl, setPrevStreamUrl] = useState(streamUrl);
+
+  // Reset override when stream changes
+  if (streamUrl !== prevStreamUrl) {
+    setPrevStreamUrl(streamUrl);
+    setUserOverriddenMode(null);
+    setYoutubeFailed(false);
   }
 
-  return <NativePlayer streamUrl={streamUrl} channelName={channelName} onError={onError} headers={headers} />;
+  // Derive the current mode
+  const mode: PlayerMode = userOverriddenMode ?? (youtubeUrl && !youtubeFailed ? 'youtube' : 'native');
+
+  // If YouTube fails (e.g., no live stream), fall back to native
+  const handleYoutubeFallback = useCallback(() => {
+    setYoutubeFailed(true);
+    setUserOverriddenMode('native');
+  }, []);
+
+  // Switch to native player
+  const switchToNative = useCallback(() => {
+    setUserOverriddenMode('native');
+  }, []);
+
+  // Switch back to YouTube
+  const switchToYoutube = useCallback(() => {
+    if (youtubeUrl) {
+      setUserOverriddenMode('youtube');
+      setYoutubeFailed(false);
+    }
+  }, [youtubeUrl]);
+
+  return (
+    <div className="space-y-2">
+      {/* Source switcher tabs */}
+      {youtubeUrl && (
+        <div className="flex items-center gap-2">
+          <Button
+            variant={mode === 'youtube' ? 'default' : 'outline'}
+            size="sm"
+            onClick={switchToYoutube}
+            className={`gap-1.5 text-xs h-7 rounded-full px-3 ${
+              mode === 'youtube'
+                ? 'bg-red-600 hover:bg-red-700 text-white border-red-600'
+                : 'text-gray-400 border-white/10 hover:text-white hover:border-white/20 hover:bg-white/5'
+            }`}
+          >
+            <Tv className="w-3 h-3" />
+            YouTube
+          </Button>
+          <Button
+            variant={mode === 'native' ? 'default' : 'outline'}
+            size="sm"
+            onClick={switchToNative}
+            className={`gap-1.5 text-xs h-7 rounded-full px-3 ${
+              mode === 'native'
+                ? 'bg-red-600 hover:bg-red-700 text-white border-red-600'
+                : 'text-gray-400 border-white/10 hover:text-white hover:border-white/20 hover:bg-white/5'
+            }`}
+          >
+            <Radio className="w-3 h-3" />
+            Streaming
+          </Button>
+        </div>
+      )}
+
+      {/* Player */}
+      {mode === 'youtube' && youtubeUrl ? (
+        <YouTubeEmbed
+          url={youtubeUrl}
+          channelName={channelName}
+          onFallback={handleYoutubeFallback}
+        />
+      ) : (
+        <NativePlayer
+          streamUrl={streamUrl}
+          channelName={channelName}
+          onError={onError}
+          headers={headers}
+          youtubeAvailable={!!youtubeUrl}
+          onSwitchToYoutube={switchToYoutube}
+        />
+      )}
+    </div>
+  );
 }
 
 // ─── YouTube Embed Component ────────────────────────────────────────────────
 
-function YouTubeEmbed({ url, channelName }: { url: string; channelName: string }) {
+function YouTubeEmbed({ url, channelName, onFallback }: { url: string; channelName: string; onFallback: () => void }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [iframeError, setIframeError] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -62,6 +145,15 @@ function YouTubeEmbed({ url, channelName }: { url: string; channelName: string }
     }
   }, []);
 
+  const handleIframeLoad = useCallback(() => {
+    setIframeError(false);
+  }, []);
+
+  const handleIframeError = useCallback(() => {
+    setIframeError(true);
+    onFallback();
+  }, [onFallback]);
+
   return (
     <div
       ref={containerRef}
@@ -69,12 +161,15 @@ function YouTubeEmbed({ url, channelName }: { url: string; channelName: string }
       style={{ aspectRatio: '16/9' }}
     >
       <iframe
+        ref={iframeRef}
         src={url}
         className="w-full h-full"
         allow="autoplay; encrypted-media; fullscreen"
         allowFullScreen
         title={`${channelName} - YouTube Live`}
         style={{ border: 'none' }}
+        onLoad={handleIframeLoad}
+        onError={handleIframeError}
       />
 
       {/* Channel Name Overlay */}
@@ -92,6 +187,13 @@ function YouTubeEmbed({ url, channelName }: { url: string; channelName: string }
         </div>
       </div>
 
+      {/* YouTube source badge */}
+      <div className="absolute bottom-14 left-4 pointer-events-none">
+        <div className="bg-red-700/80 rounded px-2 py-0.5">
+          <span className="text-white text-[9px] font-medium">YouTube Live</span>
+        </div>
+      </div>
+
       {/* Fullscreen button */}
       <div className="absolute bottom-4 right-4">
         <Button
@@ -103,16 +205,30 @@ function YouTubeEmbed({ url, channelName }: { url: string; channelName: string }
           {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
         </Button>
       </div>
+
+      {/* Fallback hint */}
+      {iframeError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+          <div className="text-center p-4">
+            <AlertCircle className="w-10 h-10 text-yellow-400 mx-auto mb-2" />
+            <p className="text-white text-sm">YouTube live tidak tersedia</p>
+            <p className="text-gray-400 text-xs mt-1">Beralih ke streaming langsung...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── Native HLS/DASH Player ─────────────────────────────────────────────────
 
-function NativePlayer({ streamUrl, channelName, onError, headers }: Omit<VideoPlayerProps, 'youtubeUrl'>) {
+function NativePlayer({ streamUrl, channelName, onError, headers, youtubeAvailable, onSwitchToYoutube }: Omit<VideoPlayerProps, 'youtubeUrl'> & {
+  youtubeAvailable: boolean;
+  onSwitchToYoutube: () => void;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const dashRef = useRef<any>(null); // dashjs MediaPlayer - dynamically loaded
+  const dashRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playPromiseRef = useRef<Promise<void> | null>(null);
@@ -197,13 +313,11 @@ function NativePlayer({ streamUrl, channelName, onError, headers }: Omit<VideoPl
     const video = videoRef.current;
     if (!video || !streamUrl) return;
 
-    // Destroy previous instances
     destroyPlayers();
 
     const streamType = detectStreamType(streamUrl);
 
     if (streamType === 'dash') {
-      // DASH stream - dynamically import dashjs
       let cancelled = false;
       getDashjs().then((dashjsLib) => {
         if (cancelled || !video) return;
@@ -229,7 +343,6 @@ function NativePlayer({ streamUrl, channelName, onError, headers }: Omit<VideoPl
               onError?.('Max retries exceeded');
               return;
             }
-            // Don't show error during auto-retry, keep loading state
           });
 
           player.on(dashjsLib.MediaPlayer.events.PLAYBACK_PLAYING, () => {
@@ -291,7 +404,6 @@ function NativePlayer({ streamUrl, channelName, onError, headers }: Omit<VideoPl
             }
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
-                // Don't show error during auto-retry, just keep loading state
                 hls.startLoad();
                 break;
               case Hls.ErrorTypes.MEDIA_ERROR:
@@ -409,7 +521,6 @@ function NativePlayer({ streamUrl, channelName, onError, headers }: Omit<VideoPl
     setError(null);
     setIsLoading(true);
     retryCountRef.current = 0;
-    // Reinitialize the stream
     if (dashRef.current) {
       dashRef.current.reset();
       dashRef.current = null;
@@ -451,17 +562,32 @@ function NativePlayer({ streamUrl, channelName, onError, headers }: Omit<VideoPl
           <div className="flex flex-col items-center gap-4 p-4 text-center">
             <AlertCircle className="w-12 h-12 text-red-400" />
             <p className="text-white text-sm max-w-xs">{error}</p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                retry();
-              }}
-              className="text-white border-white/30 hover:bg-white/10"
-            >
-              Coba Lagi
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  retry();
+                }}
+                className="text-white border-white/30 hover:bg-white/10"
+              >
+                Coba Lagi
+              </Button>
+              {youtubeAvailable && (
+                <Button
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSwitchToYoutube();
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  <Tv className="w-3.5 h-3.5 mr-1.5" />
+                  YouTube
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -482,6 +608,13 @@ function NativePlayer({ streamUrl, channelName, onError, headers }: Omit<VideoPl
         <div className="bg-red-600 rounded-md px-2 py-0.5 flex items-center gap-1.5">
           <Radio className="w-3 h-3 text-white" />
           <span className="text-white text-xs font-bold">LIVE</span>
+        </div>
+      </div>
+
+      {/* Stream source badge */}
+      <div className="absolute bottom-14 left-4 pointer-events-none">
+        <div className="bg-blue-700/80 rounded px-2 py-0.5">
+          <span className="text-white text-[9px] font-medium">IPTV Stream</span>
         </div>
       </div>
 
@@ -511,14 +644,30 @@ function NativePlayer({ streamUrl, channelName, onError, headers }: Omit<VideoPl
               {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
             </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleFullscreen}
-            className="text-white hover:bg-white/10 h-9 w-9"
-          >
-            {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-          </Button>
+          <div className="flex items-center gap-2">
+            {youtubeAvailable && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSwitchToYoutube();
+                }}
+                className="text-white hover:bg-white/10 h-7 text-[10px] gap-1"
+              >
+                <Tv className="w-3 h-3" />
+                YouTube
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleFullscreen}
+              className="text-white hover:bg-white/10 h-9 w-9"
+            >
+              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
